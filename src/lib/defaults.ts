@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   freeCenter: true,
   hostMode: false,
   countdownSeconds: null,
+  celebrationDuration: 12,
+  autoAdvanceOnWin: true,
 };
 
 export function createId(prefix = "id"): string {
@@ -25,7 +27,6 @@ export function createRound(partial: Partial<BingoRound> = {}): BingoRound {
     patternId: "one-line",
     prize: "Premio sorpresa",
     description: "",
-    resetNumbersOnStart: false,
     ...partial,
   };
 }
@@ -37,7 +38,6 @@ export const DEMO_ROUNDS: BingoRound[] = [
     patternId: "first-3",
     prize: "Chocolates",
     description: "Para entrar en calor.",
-    resetNumbersOnStart: false,
   },
   {
     id: "ronda-demo-2",
@@ -45,7 +45,6 @@ export const DEMO_ROUNDS: BingoRound[] = [
     patternId: "one-line",
     prize: "Caja Dieciochera",
     description: "",
-    resetNumbersOnStart: false,
   },
   {
     id: "ronda-demo-3",
@@ -53,7 +52,6 @@ export const DEMO_ROUNDS: BingoRound[] = [
     patternId: "diagonal-lr",
     prize: "Gift Card $30.000",
     description: "",
-    resetNumbersOnStart: false,
   },
   {
     id: "ronda-demo-4",
@@ -61,7 +59,6 @@ export const DEMO_ROUNDS: BingoRound[] = [
     patternId: "full-card",
     prize: "Gran Premio",
     description: "El premio mayor de la noche.",
-    resetNumbersOnStart: false,
   },
 ];
 
@@ -78,6 +75,7 @@ export function createInitialState(): BingoGameState {
     reveal: null,
     review: null,
     winner: null,
+    intermission: null,
     countdown: null,
     setupCompleted: false,
     updatedAt: Date.now(),

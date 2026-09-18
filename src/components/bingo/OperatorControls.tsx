@@ -3,6 +3,7 @@
 import {
   ExternalLink,
   Flag,
+  FlagOff,
   Pause,
   Play,
   Repeat,
@@ -28,35 +29,42 @@ export function OperatorControls({
   const endReview = useGameStore((s) => s.endReview);
   const togglePause = useGameStore((s) => s.togglePause);
   const advanceRound = useGameStore((s) => s.advanceRound);
+  const startRound = useGameStore((s) => s.startRound);
+  const finishGame = useGameStore((s) => s.finishGame);
   const startGame = useGameStore((s) => s.startGame);
   const startCountdown = useGameStore((s) => s.startCountdown);
+  const cancelCountdown = useGameStore((s) => s.cancelCountdown);
   const backToPregame = useGameStore((s) => s.backToPregame);
   const clearNumbers = useGameStore((s) => s.clearNumbers);
 
   const reviewing = isReviewActive(game, Date.now());
   const paused = game.status === "paused";
-  const isLastRound = game.currentRoundIndex >= game.rounds.length - 1;
   const nextRound = game.rounds[game.currentRoundIndex + 1];
+  const waiting = Boolean(game.intermission);
+  const currentRound = game.rounds[game.currentRoundIndex];
 
   const handleAdvance = async () => {
     if (!nextRound) {
-      toast.error("Esta es la última ronda del bingo");
+      const ok = await confirmAction({
+        title: "Terminar el bingo",
+        message:
+          "Esta es la última ronda. El proyector mostrará la pantalla de cierre con todos los premios.",
+        confirmLabel: "Terminar bingo",
+      });
+      if (!ok) return;
+      finishGame();
+      toast.success("Bingo terminado");
       return;
     }
     const pattern = getPattern(nextRound.patternId, game.customPatterns);
     const ok = await confirmAction({
       title: "Siguiente premio",
-      message: `Pasar a «${nextRound.name}» · ${pattern.name} · Premio: ${nextRound.prize}.${
-        nextRound.resetNumbersOnStart
-          ? " Esta ronda reinicia los números sorteados: se borrarán los números actuales."
-          : " Los números sorteados se mantienen."
-      }`,
+      message: `Pasar a «${nextRound.name}» · ${pattern.name} · Premio: ${nextRound.prize}. La tómbola sigue igual: se mantienen los ${game.drawnNumbers.length} números ya sorteados. El proyector quedará en espera hasta que inicies la ronda.`,
       confirmLabel: "Avanzar",
-      tone: nextRound.resetNumbersOnStart ? "danger" : "normal",
     });
     if (!ok) return;
     advanceRound();
-    toast.success(`Ronda actualizada: ${nextRound.name}`);
+    toast.success(`En espera: ${nextRound.name}`);
   };
 
   const openDisplay = () => {
@@ -89,9 +97,31 @@ export function OperatorControls({
         <ShieldCheck className="h-5 w-5" /> Verificar bingo
       </Button>
 
-      <Button size="lg" variant="rojo" onClick={handleAdvance} disabled={isLastRound}>
-        <SkipForward className="h-5 w-5" /> Siguiente premio
-      </Button>
+      {waiting ? (
+        <Button
+          size="lg"
+          variant="dorado"
+          className="col-span-2 lg:col-span-1"
+          onClick={() => {
+            startRound();
+            toast.success(`${currentRound?.name ?? "Ronda"} en juego`);
+          }}
+        >
+          <Flag className="h-5 w-5" /> Comenzar {currentRound?.name ?? "ronda"}
+        </Button>
+      ) : (
+        <Button size="lg" variant="rojo" onClick={handleAdvance}>
+          {nextRound ? (
+            <>
+              <SkipForward className="h-5 w-5" /> Siguiente premio
+            </>
+          ) : (
+            <>
+              <FlagOff className="h-5 w-5" /> Terminar bingo
+            </>
+          )}
+        </Button>
+      )}
 
       {game.status === "pregame" || game.status === "setup" ? (
         <>
@@ -100,16 +130,22 @@ export function OperatorControls({
           </Button>
           <Button
             size="lg"
-            variant="outline"
+            variant={game.countdown ? "dorado" : "outline"}
             disabled={!game.settings.countdownSeconds}
             onClick={() => {
+              if (game.countdown) {
+                cancelCountdown();
+                toast.success("Cuenta regresiva cancelada");
+                return;
+              }
               const seconds = game.settings.countdownSeconds;
               if (!seconds) return;
               startCountdown(seconds);
               toast.success("Cuenta regresiva iniciada en el proyector");
             }}
           >
-            <Timer className="h-5 w-5" /> Cuenta regresiva
+            <Timer className="h-5 w-5" />
+            {game.countdown ? "Cancelar cuenta" : "Cuenta regresiva"}
           </Button>
         </>
       ) : (

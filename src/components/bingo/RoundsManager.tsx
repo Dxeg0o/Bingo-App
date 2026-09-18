@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useGameStore } from "@/lib/store";
 import { confirmAction } from "@/components/ui/confirm";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export function RoundsManager({
   const removeRound = useGameStore((s) => s.removeRound);
   const moveRound = useGameStore((s) => s.moveRound);
   const addRound = useGameStore((s) => s.addRound);
+  const goToRound = useGameStore((s) => s.goToRound);
   const setEventName = useGameStore((s) => s.setEventName);
 
   return (
@@ -61,6 +63,16 @@ export function RoundsManager({
               isCurrent={index === game.currentRoundIndex}
               onChange={upsertRound}
               onMove={(direction) => moveRound(round.id, direction)}
+              onPlay={async () => {
+                const ok = await confirmAction({
+                  title: `Jugar «${round.name}»`,
+                  message: `El bingo pasa a esta ronda (${round.prize}). Los números sorteados se mantienen.`,
+                  confirmLabel: "Jugar esta ronda",
+                });
+                if (!ok) return;
+                goToRound(index);
+                toast.success(`Jugando ${round.name}`);
+              }}
               onRemove={async () => {
                 const ok = await confirmAction({
                   title: "Eliminar ronda",

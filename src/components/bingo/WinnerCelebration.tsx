@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { WinnerState } from "@/lib/types";
+import type { BingoRound, WinnerState } from "@/lib/types";
 
 const CONFETTI_COLORS = ["#C62828", "#FFFDF8", "#2B5C9C", "#D9A441", "#41644A"];
 
@@ -21,7 +21,10 @@ function Confetti({ pieces = 36 }: { pieces?: number }) {
   );
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div
+      aria-hidden
+      className="sin-movimiento-ocultar pointer-events-none absolute inset-0 overflow-hidden"
+    >
       {items.map((item) => (
         <span
           key={item.id}
@@ -41,7 +44,16 @@ function Confetti({ pieces = 36 }: { pieces?: number }) {
   );
 }
 
-export function WinnerCelebration({ winner }: { winner: WinnerState }) {
+export function WinnerCelebration({
+  winner,
+  nextRound,
+  nextPatternName,
+}: {
+  winner: WinnerState;
+  /** Ronda que viene al cerrar la celebración; ausente = era la última. */
+  nextRound?: BingoRound;
+  nextPatternName?: string;
+}) {
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] text-center">
       <Confetti />
@@ -68,6 +80,18 @@ export function WinnerCelebration({ winner }: { winner: WinnerState }) {
             {winner.roundName} · {winner.patternName}
           </p>
         </div>
+
+        <p className="mt-1 text-[clamp(0.8rem,2vh,1.4rem)] font-semibold uppercase tracking-[0.18em] text-crema/70">
+          {nextRound ? (
+            <>
+              A continuación · {nextRound.name} ·{" "}
+              <span className="text-dorado">{nextPatternName}</span> ·{" "}
+              {nextRound.prize}
+            </>
+          ) : (
+            "Era el último premio de la noche"
+          )}
+        </p>
       </div>
     </div>
   );

@@ -219,6 +219,14 @@ export default function SetupPage() {
                   checked={settings.hostMode}
                   onChange={(value) => setSettings((s) => ({ ...s, hostMode: value }))}
                 />
+                <Toggle
+                  label="Pasar solo al siguiente premio"
+                  description="Tras la celebración, carga la próxima ronda y espera tu vamos."
+                  checked={settings.autoAdvanceOnWin}
+                  onChange={(value) =>
+                    setSettings((s) => ({ ...s, autoAdvanceOnWin: value }))
+                  }
+                />
               </div>
             </CardBody>
           </Card>

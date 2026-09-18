@@ -4,7 +4,7 @@ import { RotateCcw, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { playSound, unlockAudio } from "@/lib/sounds";
 import { useGameStore } from "@/lib/store";
-import type { RevealDuration, ReviewOrder } from "@/lib/types";
+import type { CelebrationDuration, RevealDuration, ReviewOrder } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { confirmAction } from "@/components/ui/confirm";
 import { Label, Toggle } from "@/components/ui/field";
@@ -99,6 +99,18 @@ export function SettingsPanel({
           ]}
         />
 
+        <OptionRow<CelebrationDuration>
+          label="Duración de la celebración del ganador"
+          value={settings.celebrationDuration}
+          onChange={(value) => updateSettings({ celebrationDuration: value })}
+          options={[
+            { label: "8 segundos", value: 8 },
+            { label: "12 segundos", value: 12 },
+            { label: "20 segundos", value: 20 },
+            { label: "Manual", value: "manual" },
+          ]}
+        />
+
         <OptionRow<number | null>
           label="Cuenta regresiva antes de empezar"
           value={settings.countdownSeconds}
@@ -117,6 +129,12 @@ export function SettingsPanel({
             description="La casilla central del cartón cuenta como marcada."
             checked={settings.freeCenter}
             onChange={(value) => updateSettings({ freeCenter: value })}
+          />
+          <Toggle
+            label="Pasar solo al siguiente premio"
+            description="Al terminar la celebración, el bingo carga la próxima ronda y espera tu vamos."
+            checked={settings.autoAdvanceOnWin}
+            onChange={(value) => updateSettings({ autoAdvanceOnWin: value })}
           />
           <Toggle
             label="Modo animador"

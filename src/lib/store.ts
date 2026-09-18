@@ -52,7 +52,8 @@ type GameStore = {
   goToRound: (index: number) => void;
   advanceRound: () => void;
   previousRound: () => void;
-  setRounds: (rounds: BingoRound[]) => void;
+  startRound: () => void;
+  finishGame: () => void;
   upsertRound: (round: BingoRound) => void;
   removeRound: (id: string) => void;
   moveRound: (id: string, direction: -1 | 1) => void;
@@ -72,7 +73,6 @@ type GameStore = {
   startCountdown: (seconds: number) => void;
   cancelCountdown: () => void;
 
-  newGame: () => void;
   loadDemo: () => void;
   applySetup: (input: {
     eventName: string;
@@ -91,6 +91,39 @@ export const useGameStore = create<GameStore>()((set, get) => {
     saveState(next);
     publishState(next);
     return next;
+  };
+
+  /** Entra al intermedio: el premio y la modalidad de la ronda ya cambiaron. */
+  const intermissionFor = (
+    game: BingoGameState,
+    nextRoundIndex: number | null,
+    finishedRoundName: string | null,
+  ): BingoGameState => {
+    if (nextRoundIndex === null) {
+      return {
+        ...game,
+        reveal: null,
+        review: null,
+        winner: null,
+        countdown: null,
+        intermission: { startedAt: Date.now(), finishedRoundName, nextRoundIndex: null },
+      };
+    }
+    return {
+      ...game,
+      status: "playing" as const,
+      currentRoundIndex: nextRoundIndex,
+      // La tómbola sigue corriendo: la ronda nueva hereda los números.
+      reveal: null,
+      review: null,
+      winner: null,
+      countdown: null,
+      intermission: {
+        startedAt: Date.now(),
+        finishedRoundName,
+        nextRoundIndex,
+      },
+    };
   };
 
   const revealFor = (game: BingoGameState, value: number, sequence: number) => {
@@ -176,21 +209,29 @@ export const useGameStore = create<GameStore>()((set, get) => {
         const reveal = revealFor(g, value, number.sequence);
         const every = g.settings.autoReviewEvery;
         const shouldReview = !!every && drawnNumbers.length % every === 0;
-        const reviewStart = reveal.endsAt ?? Date.now() + 1500;
+        // Con revelado manual el repaso queda encolado: arranca cuando el
+        // operador cierra el número, no 1,5 s después de cantarlo.
+        const manualReveal = reveal.endsAt === null;
+        const reviewStart = reveal.endsAt ?? Date.now();
         return {
           ...g,
           status: "playing" as const,
           drawnNumbers,
           reveal,
           countdown: null,
-          // Un número nuevo siempre manda: corta el repaso o la celebración en curso.
+          // Un número nuevo siempre manda: corta el repaso, la celebración
+          // o el intermedio en curso.
           winner: null,
+          intermission: null,
           review: shouldReview
             ? {
                 order: g.settings.reviewOrder,
                 startedAt: reviewStart,
-                endsAt: reviewStart + g.settings.reviewDuration * 1000,
+                endsAt: manualReveal
+                  ? null
+                  : reviewStart + g.settings.reviewDuration * 1000,
                 auto: true,
+                pending: manualReveal,
               }
             : null,
         };
@@ -247,7 +288,22 @@ export const useGameStore = create<GameStore>()((set, get) => {
       return { ok: true, number: replaced };
     },
 
-    dismissReveal: () => commit((g) => ({ ...g, reveal: null })),
+    dismissReveal: () =>
+      commit((g) => {
+        const now = Date.now();
+        return {
+          ...g,
+          reveal: null,
+          review: g.review?.pending
+            ? {
+                ...g.review,
+                pending: false,
+                startedAt: now,
+                endsAt: now + g.settings.reviewDuration * 1000,
+              }
+            : g.review,
+        };
+      }),
 
     clearNumbers: () =>
       commit((g) => ({
@@ -264,6 +320,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         status: "playing",
         setupCompleted: true,
         countdown: null,
+        intermission: null,
       })),
 
     backToPregame: () =>
@@ -287,36 +344,46 @@ export const useGameStore = create<GameStore>()((set, get) => {
           startedAt: now,
           endsAt: now + g.settings.reviewDuration * 1000,
           auto: false,
+          pending: false,
         },
       }));
     },
 
     endReview: () => commit((g) => ({ ...g, review: null })),
 
+    /** Salto directo a una ronda: sin pantalla de espera, la usa el operador. */
     goToRound: (index) =>
-      commit((g) => {
-        const safeIndex = Math.max(0, Math.min(index, g.rounds.length - 1));
-        const round = g.rounds[safeIndex];
-        const reset = round?.resetNumbersOnStart ?? false;
-        return {
-          ...g,
-          currentRoundIndex: safeIndex,
-          drawnNumbers: reset ? [] : g.drawnNumbers,
-          reveal: reset ? null : g.reveal,
-          review: null,
-          winner: null,
-        };
-      }),
-
-    advanceRound: () => get().goToRound(get().game.currentRoundIndex + 1),
-    previousRound: () => get().goToRound(get().game.currentRoundIndex - 1),
-
-    setRounds: (rounds) =>
       commit((g) => ({
         ...g,
-        rounds: rounds.length > 0 ? rounds : [createRound()],
-        currentRoundIndex: Math.min(g.currentRoundIndex, Math.max(0, rounds.length - 1)),
+        currentRoundIndex: Math.max(0, Math.min(index, g.rounds.length - 1)),
+        review: null,
+        winner: null,
+        intermission: null,
       })),
+
+    /** Cierra la ronda y deja el proyector en espera de la siguiente. */
+    advanceRound: () =>
+      commit((g) => {
+        const next = g.currentRoundIndex + 1;
+        const finished = g.rounds[g.currentRoundIndex]?.name ?? null;
+        return intermissionFor(g, next < g.rounds.length ? next : null, finished);
+      }),
+
+    previousRound: () => get().goToRound(get().game.currentRoundIndex - 1),
+
+    /** El operador da el vamos a la ronda que ya está cargada. */
+    startRound: () =>
+      commit((g) => ({
+        ...g,
+        status: "playing",
+        intermission: null,
+        countdown: null,
+      })),
+
+    finishGame: () =>
+      commit((g) =>
+        intermissionFor(g, null, g.rounds[g.currentRoundIndex]?.name ?? null),
+      ),
 
     upsertRound: (round) =>
       commit((g) => ({
@@ -387,21 +454,39 @@ export const useGameStore = create<GameStore>()((set, get) => {
       commit((g) => {
         const round = g.rounds[g.currentRoundIndex];
         const pattern = getPattern(round?.patternId ?? "one-line", g.customPatterns);
+        const now = Date.now();
+        const duration = g.settings.celebrationDuration;
+        const next = g.currentRoundIndex + 1;
         return {
           ...g,
           reveal: null,
           review: null,
+          intermission: null,
           winner: {
             prize: round?.prize ?? "Premio",
             roundName: round?.name ?? "Ronda",
             patternName: pattern.name,
             winnerName: winnerName?.trim() || undefined,
-            startedAt: Date.now(),
+            startedAt: now,
+            endsAt: duration === "manual" ? null : now + duration * 1000,
+            roundIndex: g.currentRoundIndex,
+            nextRoundIndex: next < g.rounds.length ? next : null,
           },
         };
       }),
 
-    endCelebration: () => commit((g) => ({ ...g, winner: null })),
+    /**
+     * Cierra la celebración. Con `autoAdvanceOnWin` el bingo encadena solo el
+     * premio siguiente y queda esperando el vamos del operador.
+     */
+    endCelebration: () =>
+      commit((g) => {
+        const winner = g.winner;
+        if (!winner || !g.settings.autoAdvanceOnWin) {
+          return { ...g, winner: null };
+        }
+        return intermissionFor(g, winner.nextRoundIndex, winner.roundName);
+      }),
 
     startCountdown: (seconds) =>
       commit((g) => ({
@@ -411,18 +496,6 @@ export const useGameStore = create<GameStore>()((set, get) => {
       })),
 
     cancelCountdown: () => commit((g) => ({ ...g, countdown: null })),
-
-    newGame: () =>
-      commit((g) => ({
-        ...g,
-        status: "pregame",
-        drawnNumbers: [],
-        currentRoundIndex: 0,
-        reveal: null,
-        review: null,
-        winner: null,
-        countdown: null,
-      })),
 
     loadDemo: () => commit((g) => ({ ...createDemoState(), customPatterns: g.customPatterns })),
 
@@ -439,6 +512,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         reveal: null,
         review: null,
         winner: null,
+        intermission: null,
         countdown: null,
       })),
   };

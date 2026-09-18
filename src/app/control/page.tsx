@@ -6,6 +6,7 @@ import {
   Keyboard,
   ListOrdered,
   PartyPopper,
+  Play,
   Settings,
   Sparkles,
   Tv,
@@ -17,6 +18,7 @@ import { BingoBoard } from "@/components/bingo/BingoBoard";
 import { BingoValidator } from "@/components/bingo/BingoValidator";
 import { GameProgress } from "@/components/bingo/GameProgress";
 import { HistoryPanel } from "@/components/bingo/HistoryPanel";
+import { NewGamePanel } from "@/components/bingo/NewGamePanel";
 import { NumberInput } from "@/components/bingo/NumberInput";
 import { NumberSearch } from "@/components/bingo/NumberSearch";
 import { OperatorControls } from "@/components/bingo/OperatorControls";
@@ -29,7 +31,7 @@ import { ShortcutsPanel } from "@/components/bingo/ShortcutsPanel";
 import { Banderines } from "@/components/layout/Banderines";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ConfirmHost, confirmAction } from "@/components/ui/confirm";
+import { ConfirmHost } from "@/components/ui/confirm";
 import { Select } from "@/components/ui/field";
 import { Modal, anyModalOpen } from "@/components/ui/modal";
 import { focusNumberInput } from "@/components/bingo/NumberInput";
@@ -45,16 +47,40 @@ export default function ControlPage() {
   const togglePause = useGameStore((s) => s.togglePause);
   const setCurrentPattern = useGameStore((s) => s.setCurrentPattern);
   const endCelebration = useGameStore((s) => s.endCelebration);
-  const newGame = useGameStore((s) => s.newGame);
+  const startRound = useGameStore((s) => s.startRound);
+  const dismissReveal = useGameStore((s) => s.dismissReveal);
 
   const [openModal, setOpenModal] = useState<
-    null | "validator" | "rounds" | "settings" | "patterns" | "shortcuts" | "history"
+    | null
+    | "validator"
+    | "rounds"
+    | "settings"
+    | "patterns"
+    | "shortcuts"
+    | "history"
+    | "new-game"
   >(null);
 
   const round = game.rounds[game.currentRoundIndex];
   const pattern = getPattern(round?.patternId ?? "one-line", game.customPatterns);
   useNow(game.review?.endsAt ?? null);
   const reviewing = isReviewActive(game, Date.now());
+  /** Revelado sin tiempo: hay que cerrarlo a mano para volver al tablero. */
+  const manualReveal = game.reveal !== null && game.reveal.endsAt === null;
+
+  // El panel es el que manda: cuando vence la celebración la cierra y, si
+  // corresponde, deja cargado el premio siguiente.
+  const celebrationEndsAt = game.winner?.endsAt ?? null;
+  useEffect(() => {
+    if (celebrationEndsAt === null) return;
+    const id = window.setTimeout(
+      () => {
+        if (useGameStore.getState().game.winner) endCelebration();
+      },
+      Math.max(0, celebrationEndsAt - Date.now()) + 50,
+    );
+    return () => window.clearTimeout(id);
+  }, [celebrationEndsAt, endCelebration]);
 
   const toggleReview = useCallback(() => {
     if (isReviewActive(useGameStore.getState().game, Date.now())) endReview();
@@ -92,13 +118,18 @@ export default function ControlPage() {
           event.preventDefault();
           window.dispatchEvent(new Event("bingo:correct"));
           break;
+        case " ":
+          if (!useGameStore.getState().game.reveal) break;
+          event.preventDefault();
+          dismissReveal();
+          break;
         default:
           break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleReview, togglePause]);
+  }, [toggleReview, togglePause, dismissReveal]);
 
   useEffect(() => {
     if (hydrated) focusNumberInput();
@@ -129,18 +160,24 @@ export default function ControlPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
-              game.status === "paused"
-                ? "bg-rojo text-papel"
-                : game.status === "playing"
-                  ? "bg-verde text-papel"
-                  : "bg-azul/15 text-azul"
+              game.intermission
+                ? "bg-dorado text-noche"
+                : game.status === "paused"
+                  ? "bg-rojo text-papel"
+                  : game.status === "playing"
+                    ? "bg-verde text-papel"
+                    : "bg-azul/15 text-azul"
             }`}
           >
-            {game.status === "paused"
-              ? "En pausa"
-              : game.status === "playing"
-                ? "En juego"
-                : "Pantalla previa"}
+            {game.intermission
+              ? game.intermission.nextRoundIndex === null
+                ? "Bingo terminado"
+                : "Esperando ronda"
+              : game.status === "paused"
+                ? "En pausa"
+                : game.status === "playing"
+                  ? "En juego"
+                  : "Pantalla previa"}
           </span>
           <Button variant="outline" size="sm" onClick={() => setOpenModal("rounds")}>
             <ListOrdered className="h-4 w-4" /> Rondas
@@ -161,24 +198,8 @@ export default function ControlPage() {
           >
             <Tv className="h-4 w-4" /> Proyector
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={async () => {
-              const ok = await confirmAction({
-                title: "Nueva partida",
-                message:
-                  "Esto eliminará el estado de la partida actual (números sorteados y ronda en curso). Las rondas, patrones y configuración se mantienen.",
-                confirmLabel: "Nueva partida",
-                tone: "danger",
-              });
-              if (ok) {
-                newGame();
-                toast.success("Nueva partida lista");
-              }
-            }}
-          >
-            Nueva partida
+          <Button variant="rojo" size="sm" onClick={() => setOpenModal("new-game")}>
+            <Sparkles className="h-4 w-4" /> Nuevo juego
           </Button>
           <Link
             href="/"
@@ -203,8 +224,46 @@ export default function ControlPage() {
               focusNumberInput();
             }}
           >
-            Finalizar celebración
+            {game.settings.autoAdvanceOnWin
+              ? "Finalizar y pasar al siguiente premio"
+              : "Finalizar celebración"}
           </Button>
+        </div>
+      )}
+
+      {game.intermission && game.intermission.nextRoundIndex !== null && (
+        <div className="mx-auto mb-3 flex max-w-[1700px] flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dorado bg-dorado/20 px-4 py-3">
+          <p className="min-w-0 font-display text-xl font-black text-noche">
+            En espera · Próxima ronda: {round?.name} · {pattern.name} · Premio:{" "}
+            {round?.prize}
+          </p>
+          <Button
+            variant="dorado"
+            onClick={() => {
+              startRound();
+              focusNumberInput();
+              toast.success(`${round?.name ?? "Ronda"} en juego`);
+            }}
+          >
+            <Play className="h-5 w-5" /> Comenzar ronda
+          </Button>
+        </div>
+      )}
+
+      {game.intermission && game.intermission.nextRoundIndex === null && (
+        <div className="mx-auto mb-3 flex max-w-[1700px] flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-azul/30 bg-azul/10 px-4 py-3">
+          <p className="min-w-0 font-display text-xl font-black text-azul">
+            Se jugaron las {game.rounds.length} rondas. El proyector muestra la pantalla
+            de cierre.
+          </p>
+          <span className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setOpenModal("rounds")}>
+              <ListOrdered className="h-4 w-4" /> Agregar más rondas
+            </Button>
+            <Button onClick={() => setOpenModal("new-game")}>
+              <Sparkles className="h-4 w-4" /> Preparar nuevo juego
+            </Button>
+          </span>
         </div>
       )}
 
@@ -312,6 +371,25 @@ export default function ControlPage() {
         </aside>
       </main>
 
+      {manualReveal && !reviewing && (
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border-2 border-dorado bg-noche px-5 py-2.5 text-papel shadow-xl">
+          <span className="flex items-center gap-3 text-sm font-bold uppercase tracking-[0.15em]">
+            Número en pantalla
+            <Button
+              variant="dorado"
+              size="sm"
+              onClick={() => {
+                dismissReveal();
+                focusNumberInput();
+              }}
+              title="Atajo: barra espaciadora"
+            >
+              Cerrar número
+            </Button>
+          </span>
+        </div>
+      )}
+
       {reviewing && (
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border-2 border-dorado bg-noche px-5 py-2.5 text-papel shadow-xl">
           <span className="flex items-center gap-3 text-sm font-bold uppercase tracking-[0.15em]">
@@ -330,6 +408,7 @@ export default function ControlPage() {
           focusNumberInput();
         }}
       />
+      <NewGamePanel open={openModal === "new-game"} onClose={() => setOpenModal(null)} />
       <RoundsManager open={openModal === "rounds"} onClose={() => setOpenModal(null)} />
       <SettingsPanel open={openModal === "settings"} onClose={() => setOpenModal(null)} />
       <PatternBuilder open={openModal === "patterns"} onClose={() => setOpenModal(null)} />

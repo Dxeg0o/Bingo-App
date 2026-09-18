@@ -1,4 +1,4 @@
-import { STATE_VERSION, createInitialState } from "./defaults";
+import { DEFAULT_SETTINGS, STATE_VERSION, createInitialState } from "./defaults";
 import type { BingoGameState } from "./types";
 
 export const STORAGE_KEY = "bingo-dieciochero:state:v1";
@@ -11,8 +11,13 @@ export function loadState(): BingoGameState | null {
     const parsed = JSON.parse(raw) as BingoGameState;
     if (!parsed || typeof parsed !== "object") return null;
     if (parsed.version !== STATE_VERSION) return null;
-    // Rellena campos nuevos si el estado guardado es más antiguo.
-    return { ...createInitialState(), ...parsed };
+    // Rellena campos nuevos si el estado guardado es más antiguo. `settings` se
+    // mezcla aparte: un spread superficial dejaría fuera los ajustes nuevos.
+    return {
+      ...createInitialState(),
+      ...parsed,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+    };
   } catch {
     return null;
   }

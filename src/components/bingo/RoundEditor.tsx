@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Play, Trash2 } from "lucide-react";
 import { getAllPatterns, getPattern } from "@/lib/patterns";
 import type { BingoPattern, BingoRound } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Select, Toggle } from "@/components/ui/field";
+import { Input, Label, Select } from "@/components/ui/field";
 import { PatternPreview } from "./PatternPreview";
 
 export function RoundEditor({
@@ -16,6 +16,7 @@ export function RoundEditor({
   onChange,
   onRemove,
   onMove,
+  onPlay,
   isCurrent,
 }: {
   round: BingoRound;
@@ -26,6 +27,8 @@ export function RoundEditor({
   onChange: (round: BingoRound) => void;
   onRemove?: () => void;
   onMove?: (direction: -1 | 1) => void;
+  /** Saltar directamente a esta ronda (solo en el panel del operador). */
+  onPlay?: () => void;
   isCurrent?: boolean;
 }) {
   const patterns = getAllPatterns(customPatterns);
@@ -42,7 +45,12 @@ export function RoundEditor({
           Ronda {index + 1} de {total}
           {isCurrent && <span className="ml-2 text-rojo">· en juego</span>}
         </span>
-        <span className="flex gap-1">
+        <span className="flex items-center gap-1">
+          {onPlay && !isCurrent && (
+            <Button variant="outline" size="sm" onClick={onPlay}>
+              <Play className="h-4 w-4" /> Jugar esta ronda
+            </Button>
+          )}
           {onMove && (
             <>
               <Button
@@ -121,18 +129,6 @@ export function RoundEditor({
                 onChange({ ...round, description: event.target.value })
               }
               maxLength={80}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <Toggle
-              label="Reiniciar números al iniciar esta ronda"
-              description={
-                round.resetNumbersOnStart
-                  ? "La tómbola parte de cero en esta ronda."
-                  : "Continúa con los números ya sorteados."
-              }
-              checked={round.resetNumbersOnStart}
-              onChange={(value) => onChange({ ...round, resetNumbersOnStart: value })}
             />
           </div>
         </div>

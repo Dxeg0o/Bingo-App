@@ -11,7 +11,7 @@ import {
 } from "@/lib/hooks";
 import { getPattern } from "@/lib/patterns";
 import { playSound } from "@/lib/sounds";
-import type { BingoGameState } from "@/lib/types";
+import type { BingoGameState, DisplayState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
 import { BingoBoard } from "./BingoBoard";
 import { CurrentNumber } from "./CurrentNumber";
@@ -19,6 +19,7 @@ import { GameProgress } from "./GameProgress";
 import { PatternPreview } from "./PatternPreview";
 import { RecentNumbers } from "./RecentNumbers";
 import { ReviewMode } from "./ReviewMode";
+import { GameOver, RoundIntermission } from "./RoundIntermission";
 import { WinnerCelebration } from "./WinnerCelebration";
 
 export function ProjectionScreen({ game }: { game: BingoGameState }) {
@@ -36,10 +37,14 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
   useSounds(game, displayState);
 
   const countdownLeft = game.countdown ? game.countdown.endsAt - now : 0;
+  const soloEscena =
+    displayState === "WINNER" ||
+    displayState === "ROUND_INTERMISSION" ||
+    displayState === "GAME_OVER";
 
   return (
     <div className="textura-noche flex h-dvh w-full flex-col overflow-hidden text-crema">
-      {displayState !== "WINNER" && (
+      {!soloEscena && (
         <header className="flex shrink-0 items-center justify-between gap-6 px-6 pb-2 pt-3">
           <div className="min-w-0">
             <h1 className="truncate font-display text-[clamp(1.1rem,2.6vh,2rem)] font-black uppercase tracking-wide text-crema">
@@ -74,7 +79,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
         </header>
       )}
 
-      <main className="relative min-h-0 flex-1 px-6 pb-4">
+      <main className="relative min-h-0 flex-1">
           {displayState === "PRE_GAME" && (
             <Screen key="pre">
               <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 text-center">
@@ -129,15 +134,6 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
                   letter={game.reveal.letter}
                   phrase={game.reveal.phrase}
                 />
-                <div className="mt-2 w-full max-w-4xl">
-                  <RecentNumbers
-                    drawnNumbers={game.drawnNumbers.slice(0, -1)}
-                    count={6}
-                    theme="dark"
-                    size="md"
-                    className="justify-center"
-                  />
-                </div>
               </div>
             </Screen>
           )}
@@ -221,9 +217,36 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
             </Screen>
           )}
 
+          {displayState === "ROUND_INTERMISSION" && (
+            <Screen key={`intermedio-${game.intermission?.startedAt}`}>
+              <RoundIntermission game={game} countdownLeft={countdownLeft} />
+            </Screen>
+          )}
+
+          {displayState === "GAME_OVER" && (
+            <Screen key="fin">
+              <GameOver game={game} />
+            </Screen>
+          )}
+
           {displayState === "WINNER" && game.winner && (
             <Screen key="winner">
-              <WinnerCelebration winner={game.winner} />
+              <WinnerCelebration
+                winner={game.winner}
+                nextRound={
+                  game.winner.nextRoundIndex !== null
+                    ? game.rounds[game.winner.nextRoundIndex]
+                    : undefined
+                }
+                nextPatternName={
+                  game.winner.nextRoundIndex !== null
+                    ? getPattern(
+                        game.rounds[game.winner.nextRoundIndex]?.patternId ?? "one-line",
+                        game.customPatterns,
+                      ).name
+                    : undefined
+                }
+              />
             </Screen>
           )}
       </main>
@@ -244,17 +267,26 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
   );
 }
 
+/**
+ * `inset-0` se mide contra la caja de relleno del <main>, así que el margen de
+ * seguridad del proyector va en la escena y no en el contenedor.
+ */
 function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <section className="absolute inset-0 min-h-0 animate-[aparecer_0.28s_ease-out] px-6 pb-2">
+    <section className="absolute inset-0 min-h-0 animate-[aparecer_0.28s_ease-out] px-6 pb-4">
       {children}
     </section>
   );
 }
 
-/** Efectos de sonido: solo suenan en la pantalla de proyección. */
-function useSounds(game: BingoGameState, displayState: string) {
+/**
+ * Efectos de sonido: solo suenan en la pantalla de proyección. Los `ref`
+ * arrancan sincronizados con el estado actual para que abrir el proyector a
+ * mitad de partida no dispare el sonido del número que ya estaba en pantalla.
+ */
+function useSounds(game: BingoGameState, displayState: DisplayState) {
   const { soundsEnabled, volume } = game.settings;
+  const primed = useRef(false);
   const lastSeq = useRef<number | null>(null);
   const lastReview = useRef<number | null>(null);
   const lastWinner = useRef<number | null>(null);
@@ -262,34 +294,32 @@ function useSounds(game: BingoGameState, displayState: string) {
 
   useEffect(() => {
     const seq = game.reveal?.sequence ?? null;
-    if (seq !== null && seq !== lastSeq.current && soundsEnabled) {
-      playSound("number", volume);
+    const review = game.review?.startedAt ?? null;
+    const winner = game.winner?.startedAt ?? null;
+    const round = game.currentRoundIndex;
+
+    if (!primed.current) {
+      primed.current = true;
+    } else if (soundsEnabled) {
+      if (seq !== null && seq !== lastSeq.current) playSound("number", volume);
+      else if (winner !== null && winner !== lastWinner.current) playSound("winner", volume);
+      else if (round !== lastRound.current) playSound("round", volume);
+      else if (displayState === "REVIEW" && review !== lastReview.current) {
+        playSound("review", volume);
+      }
     }
+
     lastSeq.current = seq;
-  }, [game.reveal?.sequence, game.reveal?.value, soundsEnabled, volume]);
-
-  useEffect(() => {
-    if (displayState !== "REVIEW") return;
-    const started = game.review?.startedAt ?? null;
-    if (started !== null && started !== lastReview.current) {
-      if (soundsEnabled) playSound("review", volume);
-      lastReview.current = started;
-    }
-  }, [displayState, game.review?.startedAt, soundsEnabled, volume]);
-
-  useEffect(() => {
-    const started = game.winner?.startedAt ?? null;
-    if (started !== null && started !== lastWinner.current) {
-      if (soundsEnabled) playSound("winner", volume);
-    }
-    lastWinner.current = started;
-  }, [game.winner?.startedAt, soundsEnabled, volume]);
-
-  useEffect(() => {
-    const index = game.currentRoundIndex;
-    if (lastRound.current !== null && index !== lastRound.current && soundsEnabled) {
-      playSound("round", volume);
-    }
-    lastRound.current = index;
-  }, [game.currentRoundIndex, soundsEnabled, volume]);
+    lastReview.current = review;
+    lastWinner.current = winner;
+    lastRound.current = round;
+  }, [
+    game.reveal?.sequence,
+    game.review?.startedAt,
+    game.winner?.startedAt,
+    game.currentRoundIndex,
+    displayState,
+    soundsEnabled,
+    volume,
+  ]);
 }

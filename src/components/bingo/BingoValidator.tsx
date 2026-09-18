@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Eraser, PartyPopper, XCircle } from "lucide-react";
+import { CheckCircle2, Eraser, PartyPopper, SkipForward, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LETTERS, LETTER_RANGES } from "@/lib/bingo";
@@ -9,10 +9,14 @@ import { useGameStore } from "@/lib/store";
 import type { CardGrid, ValidationResult } from "@/lib/types";
 import { emptyCard, isFreeCell, validateCard } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
+import { confirmAction } from "@/components/ui/confirm";
 import { Input, Label } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { PatternPreview } from "./PatternPreview";
 import { cn } from "@/lib/utils";
+
+/** Duración del barrido de comprobación antes de mostrar el veredicto. */
+const BARRIDO_MS = 620;
 
 export function BingoValidator({
   open,
@@ -27,22 +31,29 @@ export function BingoValidator({
   const [card, setCard] = useState<CardGrid>(() => emptyCard());
   const [winnerName, setWinnerName] = useState("");
   const [result, setResult] = useState<ValidationResult | null>(null);
+  /** Cambia en cada comprobación para reiniciar las animaciones del cartón. */
+  const [runId, setRunId] = useState(0);
+  const [checking, setChecking] = useState(false);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const timer = useRef<number | null>(null);
 
   const round = game.rounds[game.currentRoundIndex];
   const pattern = useMemo(
     () => getPattern(round?.patternId ?? "one-line", game.customPatterns),
     [round?.patternId, game.customPatterns],
   );
+  const nextRound = game.rounds[game.currentRoundIndex + 1];
+  const nextPattern = nextRound
+    ? getPattern(nextRound.patternId, game.customPatterns)
+    : null;
   const drawnValues = useMemo(
     () => game.drawnNumbers.map((n) => n.value),
     [game.drawnNumbers],
   );
   const freeCenter = game.settings.freeCenter;
+  const autoAdvance = game.settings.autoAdvanceOnWin;
 
-  const missingSet = new Set(
-    (result?.missing ?? []).map((m) => `${m.row}-${m.col}`),
-  );
+  const missingSet = new Set((result?.missing ?? []).map((m) => `${m.row}-${m.col}`));
 
   const setCell = (row: number, col: number, raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 2);
@@ -61,13 +72,46 @@ export function BingoValidator({
     }
   };
 
+  /** Comprueba el cartón con un barrido animado y luego muestra el veredicto. */
   const validate = () => {
-    setResult(validateCard(card, pattern, drawnValues, freeCenter));
+    const outcome = validateCard(card, pattern, drawnValues, freeCenter);
+    if (timer.current) window.clearTimeout(timer.current);
+    setResult(null);
+    setChecking(true);
+    setRunId((n) => n + 1);
+    timer.current = window.setTimeout(() => {
+      setChecking(false);
+      setResult(outcome);
+    }, BARRIDO_MS);
   };
 
-  const confirmWinner = () => {
+  const reset = () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    setCard(emptyCard());
+    setResult(null);
+    setChecking(false);
+    setWinnerName("");
+  };
+
+  const confirmWinner = async () => {
+    if (!result?.valid) {
+      const ok = await confirmAction({
+        title: "Confirmar sin cartón válido",
+        message: result
+          ? `La comprobación dio «${result.message}». ¿Confirmar el ganador igualmente?`
+          : "Todavía no has verificado el cartón. ¿Confirmar el ganador igualmente?",
+        confirmLabel: "Confirmar ganador",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     declareWinner(winnerName);
-    toast.success("¡Ganador confirmado! La celebración está en el proyector.");
+    toast.success(
+      autoAdvance && nextRound
+        ? `¡Ganador confirmado! Al cerrar la celebración pasamos a ${nextRound.name} · ${nextRound.prize}.`
+        : "¡Ganador confirmado! La celebración está en el proyector.",
+    );
+    reset();
     onClose();
   };
 
@@ -80,24 +124,23 @@ export function BingoValidator({
       size="lg"
       footer={
         <>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setCard(emptyCard());
-              setResult(null);
-              setWinnerName("");
-            }}
-          >
+          <Button variant="ghost" onClick={reset}>
             <Eraser className="h-4 w-4" /> Limpiar cartón
           </Button>
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
-          <Button onClick={validate}>Verificar</Button>
+          <Button onClick={validate} disabled={checking}>
+            {checking ? "Comprobando…" : "Verificar"}
+          </Button>
           <Button
             variant="rojo"
             onClick={confirmWinner}
-            title="Muestra la celebración en el proyector"
+            title={
+              autoAdvance && nextRound
+                ? `Celebra y pasa a ${nextRound.name}`
+                : "Muestra la celebración en el proyector"
+            }
           >
             <PartyPopper className="h-4 w-4" /> Confirmar ganador
           </Button>
@@ -116,7 +159,13 @@ export function BingoValidator({
               </span>
             ))}
           </div>
-          <div className="flex flex-col gap-1">
+          <div key={runId} className="relative flex flex-col gap-1 overflow-hidden rounded-lg">
+            {checking && (
+              <span
+                aria-hidden
+                className="sin-movimiento-ocultar pointer-events-none absolute inset-x-0 top-0 z-10 h-14 animate-[barrido_0.62s_ease-in] bg-gradient-to-b from-transparent via-dorado/45 to-transparent"
+              />
+            )}
             {Array.from({ length: GRID }, (_, row) => (
               <div key={row} className="flex gap-1">
                 {Array.from({ length: GRID }, (_, col) => {
@@ -125,6 +174,7 @@ export function BingoValidator({
                   const drawn = value !== null && drawnValues.includes(value);
                   const isMissing = missingSet.has(`${row}-${col}`);
                   const { min, max } = LETTER_RANGES[LETTERS[col]];
+                  const delay = `${(row * GRID + col) * 0.022}s`;
                   if (free) {
                     return (
                       <div
@@ -148,12 +198,13 @@ export function BingoValidator({
                       value={value ?? ""}
                       onChange={(event) => setCell(row, col, event.target.value)}
                       onFocus={(event) => event.target.select()}
+                      style={{ animationDelay: delay }}
                       className={cn(
                         "num h-14 w-14 rounded-lg border-2 text-center text-lg font-bold transition-colors focus:outline-none",
                         isMissing
-                          ? "border-rojo bg-rojo/15 text-rojo"
+                          ? "animate-[faltar-celda_0.35s_ease-in-out] border-rojo bg-rojo/15 text-rojo"
                           : drawn
-                            ? "border-verde bg-verde/15 text-verde"
+                            ? "animate-[marcar-celda_0.34s_ease-out_backwards] border-verde bg-verde/15 text-verde"
                             : "border-azul/25 bg-papel text-noche",
                       )}
                     />
@@ -195,14 +246,18 @@ export function BingoValidator({
             />
           </div>
 
-          {result && (
+          {checking && (
+            <p className="rounded-xl border-2 border-dorado/50 bg-dorado/10 p-4 font-display text-xl font-bold text-azul">
+              Comprobando el cartón…
+            </p>
+          )}
+
+          {result && !checking && (
             <div
               role="status"
               className={cn(
-                "rounded-xl border-2 p-4",
-                result.valid
-                  ? "border-verde bg-verde/12"
-                  : "border-rojo bg-rojo/10",
+                "animate-[zoom-entrada_0.3s_ease-out] rounded-xl border-2 p-4",
+                result.valid ? "border-verde bg-verde/12" : "border-rojo bg-rojo/10",
               )}
             >
               <p
@@ -233,11 +288,29 @@ export function BingoValidator({
               )}
               {result.valid && (
                 <p className="mt-2 text-sm font-bold text-verde">
-                  Ganador confirmado: presiona «Confirmar ganador» para celebrarlo en el
-                  proyector.
+                  Presiona «Confirmar ganador» para celebrarlo en el proyector.
                 </p>
               )}
             </div>
+          )}
+
+          {autoAdvance && (
+            <p className="flex items-start gap-2 rounded-xl border border-azul/15 bg-crema/40 px-3 py-2.5 text-xs font-semibold text-noche/70">
+              <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-rojo" aria-hidden />
+              {nextRound && nextPattern ? (
+                <span>
+                  Al confirmar, el bingo pasa solo al siguiente premio:{" "}
+                  <strong className="text-noche">{nextRound.name}</strong> ·{" "}
+                  {nextPattern.name} · {nextRound.prize}. El proyector queda en espera
+                  hasta que des el vamos.
+                </span>
+              ) : (
+                <span>
+                  Era el último premio: al confirmar, el proyector mostrará el cierre del
+                  bingo.
+                </span>
+              )}
+            </p>
           )}
 
           <p className="text-xs text-noche/50">

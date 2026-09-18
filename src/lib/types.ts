@@ -34,17 +34,21 @@ export type BingoPattern = {
   description?: string;
 };
 
+/**
+ * Una ronda = un premio + una forma de ganarlo. Los números sorteados NO se
+ * reinician entre rondas: la tómbola es continua durante todo el juego.
+ */
 export type BingoRound = {
   id: string;
   name: string;
   patternId: string;
   prize: string;
   description?: string;
-  resetNumbersOnStart: boolean;
 };
 
 export type RevealDuration = 3 | 5 | 8 | "manual";
 export type ReviewOrder = "draw" | "numeric";
+export type CelebrationDuration = 8 | 12 | 20 | "manual";
 
 export type GameSettings = {
   revealDuration: RevealDuration;
@@ -56,6 +60,10 @@ export type GameSettings = {
   freeCenter: boolean;
   hostMode: boolean;
   countdownSeconds: number | null;
+  /** Cuánto dura la celebración antes de pasar al intermedio de la próxima ronda. */
+  celebrationDuration: CelebrationDuration;
+  /** Verificar un cartón válido encadena solo el premio siguiente. */
+  autoAdvanceOnWin: boolean;
 };
 
 export type GameStatus = "setup" | "pregame" | "playing" | "paused";
@@ -76,6 +84,8 @@ export type ReviewState = {
   /** null = repaso manual, hasta que el operador salga. */
   endsAt: number | null;
   auto: boolean;
+  /** Repaso encolado detrás de un revelado manual: arranca al cerrarlo. */
+  pending: boolean;
 };
 
 export type WinnerState = {
@@ -84,6 +94,23 @@ export type WinnerState = {
   patternName: string;
   winnerName?: string;
   startedAt: number;
+  /** null = celebración manual, se mantiene hasta que el operador la cierre. */
+  endsAt: number | null;
+  /** Ronda que se estaba jugando cuando se cantó el bingo. */
+  roundIndex: number;
+  /** Ronda que viene al terminar la celebración; null = era la última. */
+  nextRoundIndex: number | null;
+};
+
+/**
+ * Pausa entre rondas: el premio y la modalidad ya cambiaron, falta que el
+ * operador dé el vamos. `nextRoundIndex === null` significa fin del bingo.
+ */
+export type IntermissionState = {
+  startedAt: number;
+  /** Ronda recién terminada, para nombrarla en pantalla. */
+  finishedRoundName: string | null;
+  nextRoundIndex: number | null;
 };
 
 export type CountdownState = {
@@ -102,6 +129,7 @@ export type BingoGameState = {
   reveal: RevealState | null;
   review: ReviewState | null;
   winner: WinnerState | null;
+  intermission: IntermissionState | null;
   countdown: CountdownState | null;
   setupCompleted: boolean;
   updatedAt: number;
@@ -114,7 +142,9 @@ export type DisplayState =
   | "NUMBER_REVEAL"
   | "REVIEW"
   | "PAUSED"
-  | "WINNER";
+  | "WINNER"
+  | "ROUND_INTERMISSION"
+  | "GAME_OVER";
 
 export type CardGrid = (number | null)[][];
 

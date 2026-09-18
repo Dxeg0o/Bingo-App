@@ -8,6 +8,7 @@ const SHORTCUTS: [string, string][] = [
   ["C", "Corregir el último número"],
   ["R", "Iniciar o salir del repaso"],
   ["P", "Pausar o reanudar el bingo"],
+  ["Barra espaciadora", "Cerrar el número que está en pantalla"],
   ["F", "Pantalla completa (en el proyector)"],
   ["Escape", "Limpiar el input o cerrar una ventana"],
 ];

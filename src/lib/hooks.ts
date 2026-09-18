@@ -47,13 +47,31 @@ export function isRevealActive(game: BingoGameState, now: number): boolean {
 }
 
 export function isReviewActive(game: BingoGameState, now: number): boolean {
-  if (!game.review) return false;
+  if (!game.review || game.review.pending) return false;
   if (now < game.review.startedAt) return false;
   return game.review.endsAt === null || now < game.review.endsAt;
 }
 
+/**
+ * La celebración vive mientras exista `winner`. Su `endsAt` no lo mira la
+ * pantalla: lo usa el panel del operador para cerrarla y encadenar la ronda,
+ * así el proyector no parpadea entre que vence el tiempo y llega el cambio.
+ */
+export function isCelebrationActive(game: BingoGameState): boolean {
+  return Boolean(game.winner);
+}
+
 export function getDisplayState(game: BingoGameState, now: number): DisplayState {
-  if (game.winner) return "WINNER";
+  if (isCelebrationActive(game)) return "WINNER";
+  if (game.intermission) {
+    return game.intermission.nextRoundIndex === null
+      ? "GAME_OVER"
+      : "ROUND_INTERMISSION";
+  }
+  // Un revelado manual no lo interrumpe nadie: lo cierra el operador.
+  if (game.reveal?.endsAt === null && game.status !== "paused") {
+    return "NUMBER_REVEAL";
+  }
   if (isReviewActive(game, now)) return "REVIEW";
   if (game.status === "paused") return "PAUSED";
   if (game.status === "setup" || game.status === "pregame") return "PRE_GAME";
@@ -65,8 +83,8 @@ export function getDisplayState(game: BingoGameState, now: number): DisplayState
 export function getNextTransition(game: BingoGameState, now: number): number | null {
   const candidates = [
     game.reveal?.endsAt ?? null,
-    game.review?.startedAt ?? null,
-    game.review?.endsAt ?? null,
+    game.review?.pending ? null : (game.review?.startedAt ?? null),
+    game.review?.pending ? null : (game.review?.endsAt ?? null),
   ].filter((t): t is number => typeof t === "number" && t > now);
   return candidates.length > 0 ? Math.min(...candidates) : null;
 }
