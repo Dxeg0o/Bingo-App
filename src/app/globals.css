@@ -15,7 +15,6 @@
   --color-dorado: #d9a441;
 
   --font-display: var(--font-fraunces), Georgia, serif;
-  --font-fonda: var(--font-kalam), "Comic Sans MS", cursive;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --animate-shake: shake 0.35s ease-in-out;
@@ -89,11 +88,17 @@
   58% { transform: translate(-50%, -50%) scale(1.1); opacity: .85; }
   100% { transform: translate(-50%, -50%) scale(1.28); opacity: 0; }
 }
+@keyframes acentos { 0% { transform:scale(.7); opacity:0 } 25% { opacity:1 } 100% { transform:scale(1.25); opacity:0 } }
+@keyframes emboque { 0%,100%{transform:translateY(0) rotate(-3deg)} 45%{transform:translateY(-12px) rotate(5deg)} }
+@keyframes volantin-flotante { 0%,100%{transform:rotate(-3deg) translateY(0)} 50%{transform:rotate(4deg) translateY(-5px)} }
 
 .animate-volantin { animation: volantin 2.8s cubic-bezier(.2,.75,.35,1) forwards; }
 .animate-panuelo { animation: panuelo .9s cubic-bezier(.2,.8,.2,1) forwards; }
 .animate-trompo { animation: trompo 4.8s ease-in-out infinite; transform-origin: center; }
 .animate-zapateo { animation: zapateo .72s ease-out forwards; }
+.animate-accentos { animation: acentos .6s ease-out forwards; }
+.animate-emboque { animation: emboque 1.2s ease-in-out infinite; transform-origin:center; }
+.animate-volantin-flotante { animation: volantin-flotante 4s ease-in-out infinite; transform-origin:center; }
 
 :root {
   color-scheme: light;

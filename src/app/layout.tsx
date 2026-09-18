@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, Kalam } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import { ToasterProvider } from "@/components/layout/ToasterProvider";
 import "./globals.css";
 
@@ -14,13 +14,6 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   display: "swap",
   weight: ["600", "700", "900"],
-});
-
-const kalam = Kalam({
-  variable: "--font-kalam",
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -38,7 +31,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es-CL">
-      <body className={`${inter.variable} ${fraunces.variable} ${kalam.variable} antialiased`}>
+      <body className={`${inter.variable} ${fraunces.variable} antialiased`}>
         {children}
         <ToasterProvider />
       </body>
