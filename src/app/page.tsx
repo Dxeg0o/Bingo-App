@@ -45,14 +45,14 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-dorado/40 bg-azul/30 shadow-2xl shadow-black/30">
+        <div className="relative w-full max-w-[36rem] overflow-hidden rounded-3xl border border-dorado/40 bg-azul/30 shadow-2xl shadow-black/30">
           <Image
             src="/images/fiestas-patrias-bingo.png"
             alt="Pareja celebrando las Fiestas Patrias chilenas en una fonda"
             width={1122}
             height={1402}
             priority
-            className="h-52 w-full object-cover object-[center_42%] sm:h-64"
+            className="h-auto w-full"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-noche-profundo/70 via-transparent to-transparent" />
           <p className="absolute inset-x-0 bottom-0 px-5 py-4 font-display text-lg font-bold text-crema sm:text-xl">
@@ -60,15 +60,15 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+        <div className="grid w-full max-w-xl gap-2 sm:grid-cols-2">
           {saved && (
             <Button
-              size="xl"
+              size="lg"
               variant="dorado"
               className="sm:col-span-2"
               onClick={() => router.push("/control")}
             >
-              <Play className="h-6 w-6" /> Continuar partida
+              <Play className="h-5 w-5" /> Continuar partida
               {game.drawnNumbers.length > 0 && (
                 <span className="num text-base font-semibold opacity-80">
                   ({game.drawnNumbers.length} números · {pattern.name})
@@ -77,28 +77,28 @@ export default function HomePage() {
             </Button>
           )}
 
-          <Button size="xl" onClick={() => router.push("/setup")}>
-            <Settings2 className="h-6 w-6" /> Nueva partida
+          <Button size="md" onClick={() => router.push("/setup")}>
+            <Settings2 className="h-5 w-5" /> Nueva partida
           </Button>
 
           <Button
-            size="xl"
+            size="md"
             variant="rojo"
             onClick={() => {
               loadDemo();
               router.push("/control");
             }}
           >
-            <Sparkles className="h-6 w-6" /> Usar demo
+            <Sparkles className="h-5 w-5" /> Usar demo
           </Button>
 
           <Button
-            size="xl"
+            size="md"
             variant="outline"
             className="sm:col-span-2"
             onClick={() => window.open("/display", "bingo-display", "noopener")}
           >
-            <Tv className="h-6 w-6" /> Abrir proyector
+            <Tv className="h-5 w-5" /> Abrir proyector
           </Button>
         </div>
 
