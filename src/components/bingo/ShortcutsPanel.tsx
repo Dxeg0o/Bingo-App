@@ -10,6 +10,7 @@ const SHORTCUTS: [string, string][] = [
   ["P", "Pausar o reanudar el bingo"],
   ["Barra espaciadora", "Cerrar el número que está en pantalla"],
   ["F", "Pantalla completa (en el proyector)"],
+  ["Q", "Mostrar u ocultar el QR de los cartones (en el proyector)"],
   ["Escape", "Limpiar el input o cerrar una ventana"],
 ];
 

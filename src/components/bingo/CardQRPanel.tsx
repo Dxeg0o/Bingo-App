@@ -1,15 +1,14 @@
 "use client";
 
 import { Copy, ExternalLink, QrCode } from "lucide-react";
-import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { buildCardUrl, loadCardBaseUrl, saveCardBaseUrl } from "@/lib/card";
+import { useQrDataUrl } from "@/lib/qr";
 import { useGameStore } from "@/lib/store";
-
-const BASE_URL_KEY = "bingo-dieciochero:carton-base-url:v1";
 
 function isLocalHost(host: string): boolean {
   return /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host);
@@ -19,52 +18,28 @@ function isLocalHost(host: string): boolean {
  * QR para que el público abra su cartón en el celular. Ojo con la dirección:
  * "localhost" solo funciona en este computador, así que si la app corre en la
  * misma máquina hay que escribir la IP de la red (192.168.x.x) para que los
- * teléfonos de la sala puedan entrar.
+ * teléfonos de la sala puedan entrar. Lo que se escriba aquí es lo que después
+ * muestra el proyector.
  */
 export function CardQRPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const freeCenter = useGameStore((s) => s.game.settings.freeCenter);
   const [base, setBase] = useState("");
-  const [qr, setQr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || base) return;
-    const saved = window.localStorage.getItem(BASE_URL_KEY);
-    setBase(saved || window.location.origin);
+    setBase(loadCardBaseUrl());
   }, [open, base]);
 
-  const clean = base.trim().replace(/\/+$/, "");
-  const url = clean ? `${clean}/carton${freeCenter ? "" : "?libre=0"}` : "";
-
-  useEffect(() => {
-    if (!open || !url) {
-      setQr(null);
-      return;
-    }
-    let vigente = true;
-    QRCode.toDataURL(url, {
-      margin: 1,
-      width: 512,
-      errorCorrectionLevel: "M",
-      color: { dark: "#102a43", light: "#fffdf8" },
-    })
-      .then((data) => {
-        if (vigente) setQr(data);
-      })
-      .catch(() => {
-        if (vigente) setQr(null);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [open, url]);
+  const url = buildCardUrl(base, freeCenter);
+  const qr = useQrDataUrl(open ? url : "");
 
   let host = "";
   try {
-    host = clean ? new URL(clean).host : "";
+    host = url ? new URL(url).host : "";
   } catch {
     host = "";
   }
-  const direccionInvalida = clean.length > 0 && host === "";
+  const direccionInvalida = base.trim().length > 0 && host === "";
 
   return (
     <Modal
@@ -126,7 +101,7 @@ export function CardQRPanel({ open, onClose }: { open: boolean; onClose: () => v
             value={base}
             onChange={(event) => {
               setBase(event.target.value);
-              window.localStorage.setItem(BASE_URL_KEY, event.target.value);
+              saveCardBaseUrl(event.target.value);
             }}
             placeholder="http://192.168.1.10:3000"
             inputMode="url"
@@ -145,6 +120,11 @@ export function CardQRPanel({ open, onClose }: { open: boolean; onClose: () => v
         <ul className="flex flex-col gap-1 text-sm text-noche/60">
           <li>· Cada celular sortea su propio cartón y puede cambiarlo cuando quiera.</li>
           <li>· Las marcas son manuales y quedan guardadas en ese teléfono.</li>
+          <li>
+            · El proyector muestra este mismo QR en grande con el botón{" "}
+            <strong>QR</strong> de abajo a la derecha (o la tecla{" "}
+            <span className="num font-bold">Q</span>).
+          </li>
           <li>
             · El centro libre sigue la configuración de la partida:{" "}
             <strong>{freeCenter ? "activado" : "desactivado"}</strong>.

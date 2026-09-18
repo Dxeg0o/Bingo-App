@@ -1,7 +1,7 @@
 "use client";
 
-import { Maximize2, Minimize2, Pause } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Maximize2, Minimize2, Pause, QrCode } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { getLastNumber } from "@/lib/bingo";
 import {
   getDisplayState,
@@ -16,6 +16,7 @@ import type { BingoGameState, DisplayState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
 import { BingoBoard } from "./BingoBoard";
 import { CardCheck } from "./CardCheck";
+import { CardQRScreen } from "./CardQRScreen";
 import { CurrentNumber } from "./CurrentNumber";
 import { GameProgress } from "./GameProgress";
 import { PatternPreview } from "./PatternPreview";
@@ -31,12 +32,24 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
   useNow(getNextTransition(game, now), game.countdown ? 250 : null);
   const displayState = getDisplayState(game, now);
   const { isFullscreen, toggle } = useFullscreen();
+  const [showQr, setShowQr] = useState(false);
 
   const round = game.rounds[game.currentRoundIndex];
   const pattern = getPattern(round?.patternId ?? "one-line", game.customPatterns);
   const last = getLastNumber(game.drawnNumbers);
 
   useSounds(game, displayState);
+
+  // El proyector suele manejarse desde el teclado: Q muestra y esconde el QR,
+  // Escape siempre lo cierra.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "q") setShowQr((current) => !current);
+      else if (event.key === "Escape") setShowQr(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const countdownLeft = game.countdown ? game.countdown.endsAt - now : 0;
   const soloEscena =
@@ -262,18 +275,38 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
           )}
       </main>
 
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-        className="fixed bottom-3 right-3 z-20 rounded-xl border border-crema/25 bg-noche/70 p-2 text-crema/60 opacity-25 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-      >
-        {isFullscreen ? (
-          <Minimize2 className="h-5 w-5" />
-        ) : (
-          <Maximize2 className="h-5 w-5" />
-        )}
-      </button>
+      {showQr && (
+        <CardQRScreen
+          freeCenter={game.settings.freeCenter}
+          onClose={() => setShowQr(false)}
+        />
+      )}
+
+      <div className="fixed bottom-3 right-3 z-20 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowQr((current) => !current)}
+          aria-pressed={showQr}
+          aria-label="Mostrar el QR de los cartones"
+          title="Cartones en el celular (tecla Q)"
+          className="flex items-center gap-1.5 rounded-xl border border-crema/25 bg-noche/70 px-2.5 py-2 text-xs font-bold uppercase tracking-[0.18em] text-crema/60 opacity-25 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+        >
+          <QrCode className="h-5 w-5" /> QR
+        </button>
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+          className="rounded-xl border border-crema/25 bg-noche/70 p-2 text-crema/60 opacity-25 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5" />
+          ) : (
+            <Maximize2 className="h-5 w-5" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
