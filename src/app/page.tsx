@@ -1,6 +1,6 @@
 "use client";
 
-import { PartyPopper, Play, Settings2, Sparkles, Tv } from "lucide-react";
+import { PartyPopper, Play, QrCode, Settings2, Sparkles, Tv } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -95,10 +95,13 @@ export default function HomePage() {
           <Button
             size="md"
             variant="outline"
-            className="sm:col-span-2"
             onClick={() => window.open("/display", "bingo-display", "noopener")}
           >
             <Tv className="h-5 w-5" /> Abrir proyector
+          </Button>
+
+          <Button size="md" variant="outline" onClick={() => router.push("/carton")}>
+            <QrCode className="h-5 w-5" /> Cartón en el celular
           </Button>
         </div>
 
@@ -108,6 +111,7 @@ export default function HomePage() {
           </li>
           <li>Repasos automáticos</li>
           <li>Verificación de cartones</li>
+          <li>Cartones por QR en el celular</li>
           <li>Todo se guarda en este navegador</li>
         </ul>
       </div>

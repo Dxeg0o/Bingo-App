@@ -1,7 +1,16 @@
 /**
  * Sonidos generados con Web Audio: sin archivos externos ni licencias.
  */
-export type SoundName = "number" | "review" | "winner" | "round" | "error";
+export type SoundName =
+  | "number"
+  | "review"
+  | "winner"
+  | "round"
+  | "error"
+  | "suspense"
+  | "success"
+  | "fail"
+  | "applause";
 
 let ctx: AudioContext | null = null;
 
@@ -52,6 +61,36 @@ function percussion(startOffset: number, duration: number, volume: number, brigh
   source.buffer = buffer; source.connect(filter).connect(gain).connect(audio.destination); source.start(start);
 }
 
+/**
+ * Ovación: decenas de palmas al azar con una envolvente que sube rápido y se
+ * apaga de a poco. Es ruido filtrado, no un sample: no hay archivo que cargar.
+ */
+function applause(volume: number, duration = 3, delay = 0) {
+  for (let index = 0; index < 120; index += 1) {
+    // Raíz cuadrada: se amontonan al principio, como un aplauso real.
+    const at = Math.sqrt(Math.random()) * duration;
+    const subida = Math.min(1, at / 0.35);
+    const caida = 1 - Math.max(0, (at - duration * 0.5) / (duration * 0.5)) * 0.8;
+    percussion(
+      delay + at,
+      0.03 + Math.random() * 0.035,
+      volume * (0.03 + Math.random() * 0.045) * subida * caida,
+      1300 + Math.random() * 2800,
+    );
+  }
+}
+
+/** Redoble que acelera: el suspenso mientras se revisa el cartón. */
+function drumroll(volume: number, duration: number, delay = 0) {
+  let at = 0;
+  let gap = 0.085;
+  while (at < duration) {
+    percussion(delay + at, 0.05, volume * (0.04 + 0.05 * (at / duration)), 240 + Math.random() * 160);
+    at += gap;
+    gap = Math.max(0.03, gap * 0.962);
+  }
+}
+
 const PATTERNS: Record<SoundName, [number, number, number][]> = {
   // [frecuencia, retardo, duración]
   number: [
@@ -77,18 +116,54 @@ const PATTERNS: Record<SoundName, [number, number, number][]> = {
     [220, 0, 0.18],
     [180, 0.12, 0.2],
   ],
+  suspense: [],
+  success: [
+    [659.25, 0, 0.14],
+    [880, 0.12, 0.18],
+    [1174.66, 0.26, 0.3],
+  ],
+  fail: [
+    [392, 0, 0.2],
+    [311.13, 0.16, 0.24],
+    [233.08, 0.34, 0.42],
+  ],
+  applause: [],
 };
 
-export function playSound(name: SoundName, volume = 0.5): void {
+/**
+ * `delay` corre el sonido entero: sirve para que el golpe caiga junto con la
+ * animación del veredicto en vez de adelantarse.
+ */
+export function playSound(
+  name: SoundName,
+  volume = 0.5,
+  options: { duration?: number; delay?: number } = {},
+): void {
   const pattern = PATTERNS[name];
   if (!pattern) return;
+  const delay = options.delay ?? 0;
   for (const [freq, offset, duration] of pattern) {
-    tone(freq, offset, duration, volume * 0.22, name === "error" ? "triangle" : "sine");
+    tone(
+      freq,
+      delay + offset,
+      duration,
+      volume * 0.22,
+      name === "error" ? "triangle" : "sine",
+    );
   }
-  if (name === "number") percussion(0, 0.06, volume * 0.13, 520);
-  if (name === "round") { percussion(0, 0.11, volume * 0.14, 4200); percussion(0.12, 0.08, volume * 0.1, 900); }
-  if (name === "review") { percussion(0.05, 0.045, volume * 0.08, 2100); percussion(0.16, 0.045, volume * 0.08, 2100); }
-  if (name === "winner") [0, .22, .44, .68, .92, 1.18].forEach((offset, index) => percussion(offset, .07, volume * .11, index % 2 ? 3900 : 1700));
+  if (name === "number") percussion(delay, 0.06, volume * 0.13, 520);
+  if (name === "round") { percussion(delay, 0.11, volume * 0.14, 4200); percussion(delay + 0.12, 0.08, volume * 0.1, 900); }
+  if (name === "review") { percussion(delay + 0.05, 0.045, volume * 0.08, 2100); percussion(delay + 0.16, 0.045, volume * 0.08, 2100); }
+  if (name === "winner") {
+    [0, .22, .44, .68, .92, 1.18].forEach((offset, index) =>
+      percussion(delay + offset, .07, volume * .11, index % 2 ? 3900 : 1700),
+    );
+    applause(volume, options.duration ?? 3.4, delay);
+  }
+  if (name === "applause") applause(volume, options.duration ?? 3, delay);
+  if (name === "suspense") drumroll(volume, options.duration ?? 3, delay);
+  if (name === "success") applause(volume, options.duration ?? 2.2, delay);
+  if (name === "fail") percussion(delay + 0.34, 0.5, volume * 0.06, 180);
 }
 
 /** Debe llamarse desde un gesto del usuario para desbloquear el audio. */

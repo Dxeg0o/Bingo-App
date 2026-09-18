@@ -7,6 +7,8 @@ import {
   ListOrdered,
   PartyPopper,
   Play,
+  QrCode,
+  ScanLine,
   Settings,
   Sparkles,
   Tv,
@@ -16,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BingoBoard } from "@/components/bingo/BingoBoard";
 import { BingoValidator } from "@/components/bingo/BingoValidator";
+import { CardQRPanel } from "@/components/bingo/CardQRPanel";
 import { GameProgress } from "@/components/bingo/GameProgress";
 import { HistoryPanel } from "@/components/bingo/HistoryPanel";
 import { NewGamePanel } from "@/components/bingo/NewGamePanel";
@@ -49,6 +52,7 @@ export default function ControlPage() {
   const endCelebration = useGameStore((s) => s.endCelebration);
   const startRound = useGameStore((s) => s.startRound);
   const dismissReveal = useGameStore((s) => s.dismissReveal);
+  const endVerification = useGameStore((s) => s.endVerification);
 
   const [openModal, setOpenModal] = useState<
     | null
@@ -59,6 +63,7 @@ export default function ControlPage() {
     | "shortcuts"
     | "history"
     | "new-game"
+    | "qr"
   >(null);
 
   const round = game.rounds[game.currentRoundIndex];
@@ -81,6 +86,20 @@ export default function ControlPage() {
     );
     return () => window.clearTimeout(id);
   }, [celebrationEndsAt, endCelebration]);
+
+  // El veredicto negativo se retira solo: el panel es el que lleva el reloj,
+  // igual que con la celebración.
+  const verificationEndsAt = game.verification?.endsAt ?? null;
+  useEffect(() => {
+    if (verificationEndsAt === null) return;
+    const id = window.setTimeout(
+      () => {
+        if (useGameStore.getState().game.verification) endVerification();
+      },
+      Math.max(0, verificationEndsAt - Date.now()) + 50,
+    );
+    return () => window.clearTimeout(id);
+  }, [verificationEndsAt, endVerification]);
 
   const toggleReview = useCallback(() => {
     if (isReviewActive(useGameStore.getState().game, Date.now())) endReview();
@@ -198,6 +217,9 @@ export default function ControlPage() {
           >
             <Tv className="h-4 w-4" /> Proyector
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenModal("qr")}>
+            <QrCode className="h-4 w-4" /> Cartones QR
+          </Button>
           <Button variant="rojo" size="sm" onClick={() => setOpenModal("new-game")}>
             <Sparkles className="h-4 w-4" /> Nuevo juego
           </Button>
@@ -209,6 +231,33 @@ export default function ControlPage() {
           </Link>
         </div>
       </header>
+
+      {game.verification && (
+        <div
+          className={`mx-auto mb-3 flex max-w-[1700px] flex-wrap items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 ${
+            game.verification.status === "invalid"
+              ? "border-rojo bg-rojo/12"
+              : "border-dorado bg-dorado/20"
+          }`}
+        >
+          <p className="flex items-center gap-2 font-display text-xl font-black text-noche">
+            <ScanLine className="h-6 w-6 text-azul" />
+            {game.verification.status === "checking"
+              ? "Suspenso en pantalla: revisando cartón…"
+              : "En pantalla: cartón no válido. Vuelve solo al juego."}
+            {game.verification.cardLabel ? ` · ${game.verification.cardLabel}` : ""}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              endVerification();
+              focusNumberInput();
+            }}
+          >
+            Quitar del proyector
+          </Button>
+        </div>
+      )}
 
       {game.winner && (
         <div className="mx-auto mb-3 flex max-w-[1700px] flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dorado bg-dorado/20 px-4 py-3">
@@ -413,6 +462,7 @@ export default function ControlPage() {
       <SettingsPanel open={openModal === "settings"} onClose={() => setOpenModal(null)} />
       <PatternBuilder open={openModal === "patterns"} onClose={() => setOpenModal(null)} />
       <ShortcutsPanel open={openModal === "shortcuts"} onClose={() => setOpenModal(null)} />
+      <CardQRPanel open={openModal === "qr"} onClose={() => setOpenModal(null)} />
       <HistoryModal open={openModal === "history"} onClose={() => setOpenModal(null)} />
       <ConfirmHost />
     </div>

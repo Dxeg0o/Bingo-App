@@ -1,7 +1,15 @@
 "use client";
 
-import { CheckCircle2, Eraser, PartyPopper, SkipForward, XCircle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  Eraser,
+  PartyPopper,
+  ScanLine,
+  SkipForward,
+  Tv,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LETTERS, LETTER_RANGES } from "@/lib/bingo";
 import { GRID, getPattern } from "@/lib/patterns";
@@ -15,8 +23,11 @@ import { Modal } from "@/components/ui/modal";
 import { PatternPreview } from "./PatternPreview";
 import { cn } from "@/lib/utils";
 
-/** Duración del barrido de comprobación antes de mostrar el veredicto. */
+/** Duración del barrido de comprobación en el panel (no toca el proyector). */
 const BARRIDO_MS = 620;
+
+/** Cuánto aguanta en pantalla el veredicto negativo antes de volver al juego. */
+const NO_VALIDO_MS = 9000;
 
 export function BingoValidator({
   open,
@@ -27,6 +38,9 @@ export function BingoValidator({
 }) {
   const game = useGameStore((s) => s.game);
   const declareWinner = useGameStore((s) => s.declareWinner);
+  const startVerification = useGameStore((s) => s.startVerification);
+  const rejectCard = useGameStore((s) => s.rejectCard);
+  const endVerification = useGameStore((s) => s.endVerification);
 
   const [card, setCard] = useState<CardGrid>(() => emptyCard());
   const [winnerName, setWinnerName] = useState("");
@@ -72,7 +86,19 @@ export function BingoValidator({
     }
   };
 
-  /** Comprueba el cartón con un barrido animado y luego muestra el veredicto. */
+  /**
+   * Abrir el verificador ya pone el suspenso en el proyector: el público ve
+   * «Revisando cartón» todo el rato que el operador tarde en tipear.
+   */
+  useEffect(() => {
+    if (open) startVerification();
+  }, [open, startVerification]);
+
+  /**
+   * Comprobación privada del operador: marca el cartón y da el veredicto en el
+   * panel. El proyector no se entera — sigue en suspenso hasta que el operador
+   * decida qué mostrar.
+   */
   const validate = () => {
     const outcome = validateCard(card, pattern, drawnValues, freeCenter);
     if (timer.current) window.clearTimeout(timer.current);
@@ -85,12 +111,19 @@ export function BingoValidator({
     }, BARRIDO_MS);
   };
 
-  const reset = () => {
+  const reset = ({ keepScreen = false }: { keepScreen?: boolean } = {}) => {
     if (timer.current) window.clearTimeout(timer.current);
     setCard(emptyCard());
     setResult(null);
     setChecking(false);
     setWinnerName("");
+    if (!keepScreen && useGameStore.getState().game.verification) endVerification();
+  };
+
+  /** Cerrar el modal saca la revisión del proyector: nunca queda colgada. */
+  const close = () => {
+    reset();
+    onClose();
   };
 
   const confirmWinner = async () => {
@@ -99,39 +132,72 @@ export function BingoValidator({
         title: "Confirmar sin cartón válido",
         message: result
           ? `La comprobación dio «${result.message}». ¿Confirmar el ganador igualmente?`
-          : "Todavía no has verificado el cartón. ¿Confirmar el ganador igualmente?",
+          : "Todavía no has comprobado el cartón. ¿Confirmar el ganador igualmente?",
         confirmLabel: "Confirmar ganador",
         tone: "danger",
       });
       if (!ok) return;
     }
+    if (timer.current) window.clearTimeout(timer.current);
     declareWinner(winnerName);
     toast.success(
       autoAdvance && nextRound
         ? `¡Ganador confirmado! Al cerrar la celebración pasamos a ${nextRound.name} · ${nextRound.prize}.`
         : "¡Ganador confirmado! La celebración está en el proyector.",
     );
-    reset();
+    // `declareWinner` ya se llevó la revisión del proyector: no la toquemos.
+    reset({ keepScreen: true });
+    onClose();
+  };
+
+  /** Muestra en el proyector, de a poco, que el cartón no era bingo. */
+  const confirmReject = async () => {
+    if (result?.valid) {
+      const ok = await confirmAction({
+        title: "Mostrar cartón no válido",
+        message:
+          "La comprobación dio BINGO VÁLIDO. ¿Igual quieres anunciar que el cartón no era bingo?",
+        confirmLabel: "Mostrar no válido",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    if (timer.current) window.clearTimeout(timer.current);
+    rejectCard({
+      cardLabel: winnerName,
+      missingCount: result?.missing.length ?? 0,
+      holdMs: NO_VALIDO_MS,
+    });
+    toast("Anunciado en el proyector: el cartón no era bingo.");
+    reset({ keepScreen: true });
     onClose();
   };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Verificar bingo"
-      description={`Modalidad actual: ${pattern.name}. Ingresa el cartón del participante para comprobarlo.`}
+      description={`El proyector ya está en «Revisando cartón». Modalidad: ${pattern.name}. Ingresa el cartón y después anuncia el resultado.`}
       size="lg"
       footer={
         <>
-          <Button variant="ghost" onClick={reset}>
+          <Button variant="ghost" onClick={() => reset()}>
             <Eraser className="h-4 w-4" /> Limpiar cartón
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={close}>
             Cerrar
           </Button>
-          <Button onClick={validate} disabled={checking}>
-            {checking ? "Comprobando…" : "Verificar"}
+          <Button variant="outline" onClick={validate} disabled={checking}>
+            {checking ? "Comprobando…" : "Comprobar cartón"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={confirmReject}
+            title="Anuncia en el proyector que el cartón no era bingo"
+            className="border-rojo text-rojo"
+          >
+            <XCircle className="h-4 w-4" /> Cartón no válido
           </Button>
           <Button
             variant="rojo"
@@ -163,7 +229,7 @@ export function BingoValidator({
             {checking && (
               <span
                 aria-hidden
-                className="sin-movimiento-ocultar pointer-events-none absolute inset-x-0 top-0 z-10 h-14 animate-[barrido_0.62s_ease-in] bg-gradient-to-b from-transparent via-dorado/45 to-transparent"
+                className="sin-movimiento-ocultar pointer-events-none absolute inset-x-0 top-0 z-10 h-14 animate-[barrido_1.1s_ease-in-out_infinite] bg-gradient-to-b from-transparent via-dorado/45 to-transparent"
               />
             )}
             {Array.from({ length: GRID }, (_, row) => (
@@ -246,11 +312,18 @@ export function BingoValidator({
             />
           </div>
 
-          {checking && (
-            <p className="rounded-xl border-2 border-dorado/50 bg-dorado/10 p-4 font-display text-xl font-bold text-azul">
-              Comprobando el cartón…
-            </p>
-          )}
+          <div className="flex items-start gap-3 rounded-xl border-2 border-dorado/50 bg-dorado/10 p-4">
+            <ScanLine className="mt-1 h-6 w-6 shrink-0 animate-pulse text-dorado" />
+            <div>
+              <p className="font-display text-xl font-bold text-azul">
+                Suspenso en el proyector
+              </p>
+              <p className="text-xs font-semibold text-noche/65">
+                El público ve «Revisando cartón» mientras tipeas. El resultado solo sale
+                en pantalla cuando aprietas «Confirmar ganador» o «Cartón no válido».
+              </p>
+            </div>
+          </div>
 
           {result && !checking && (
             <div
@@ -286,11 +359,12 @@ export function BingoValidator({
                   ))}
                 </ul>
               )}
-              {result.valid && (
-                <p className="mt-2 text-sm font-bold text-verde">
-                  Presiona «Confirmar ganador» para celebrarlo en el proyector.
-                </p>
-              )}
+              <p className="mt-2 flex items-center gap-2 text-sm font-bold text-noche/70">
+                <Tv className="h-4 w-4 shrink-0" aria-hidden />
+                {result.valid
+                  ? "Anúncialo con «Confirmar ganador»: la celebración entra de a poco."
+                  : `Anúncialo con «Cartón no válido»: entra de a poco y vuelve al juego en ${Math.round(NO_VALIDO_MS / 1000)} segundos.`}
+              </p>
             </div>
           )}
 

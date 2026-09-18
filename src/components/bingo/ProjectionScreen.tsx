@@ -10,10 +10,12 @@ import {
   useNow,
 } from "@/lib/hooks";
 import { getPattern } from "@/lib/patterns";
-import { playSound } from "@/lib/sounds";
+import { REVELADO } from "@/lib/reveal";
+import { playSound, unlockAudio } from "@/lib/sounds";
 import type { BingoGameState, DisplayState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
 import { BingoBoard } from "./BingoBoard";
+import { CardCheck } from "./CardCheck";
 import { CurrentNumber } from "./CurrentNumber";
 import { GameProgress } from "./GameProgress";
 import { PatternPreview } from "./PatternPreview";
@@ -38,6 +40,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
   const countdownLeft = game.countdown ? game.countdown.endsAt - now : 0;
   const soloEscena =
+    displayState === "CARD_CHECK" ||
     displayState === "WINNER" ||
     displayState === "ROUND_INTERMISSION" ||
     displayState === "GAME_OVER";
@@ -217,6 +220,14 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
             </Screen>
           )}
 
+          {displayState === "CARD_CHECK" && game.verification && (
+            <Screen
+              key={`revision-${game.verification.startedAt}-${game.verification.status}`}
+            >
+              <CardCheck verification={game.verification} />
+            </Screen>
+          )}
+
           {displayState === "ROUND_INTERMISSION" && (
             <Screen key={`intermedio-${game.intermission?.startedAt}`}>
               <RoundIntermission game={game} countdownLeft={countdownLeft} />
@@ -287,22 +298,48 @@ function Screen({ children }: { children: React.ReactNode }) {
 function useSounds(game: BingoGameState, displayState: DisplayState) {
   const { soundsEnabled, volume } = game.settings;
   const primed = useRef(false);
+
+  // El navegador no deja sonar nada hasta que alguien toque esta ventana: la
+  // primera interacción del operador con el proyector desbloquea el audio.
+  useEffect(() => {
+    if (!soundsEnabled) return;
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [soundsEnabled]);
   const lastSeq = useRef<number | null>(null);
   const lastReview = useRef<number | null>(null);
   const lastWinner = useRef<number | null>(null);
   const lastRound = useRef<number | null>(null);
+  const lastCheck = useRef<string | null>(null);
 
   useEffect(() => {
     const seq = game.reveal?.sequence ?? null;
     const review = game.review?.startedAt ?? null;
     const winner = game.winner?.startedAt ?? null;
     const round = game.currentRoundIndex;
+    const checkStatus = game.verification?.status ?? null;
+    const check = checkStatus
+      ? `${game.verification?.startedAt}-${checkStatus}`
+      : null;
 
     if (!primed.current) {
       primed.current = true;
     } else if (soundsEnabled) {
-      if (seq !== null && seq !== lastSeq.current) playSound("number", volume);
-      else if (winner !== null && winner !== lastWinner.current) playSound("winner", volume);
+      // La revisión manda: el redoble y el veredicto no se pisan con nada.
+      if (check !== null && check !== lastCheck.current) {
+        // El redoble acompaña toda la revisión; el golpe del «no válido» entra
+        // con la animación, no antes.
+        if (checkStatus === "checking") playSound("suspense", volume, { duration: 6 });
+        else playSound("fail", volume, { delay: REVELADO.golpe });
+      } else if (seq !== null && seq !== lastSeq.current) playSound("number", volume);
+      else if (winner !== null && winner !== lastWinner.current) {
+        playSound("winner", volume, { delay: REVELADO.golpe });
+      }
       else if (round !== lastRound.current) playSound("round", volume);
       else if (displayState === "REVIEW" && review !== lastReview.current) {
         playSound("review", volume);
@@ -313,8 +350,11 @@ function useSounds(game: BingoGameState, displayState: DisplayState) {
     lastReview.current = review;
     lastWinner.current = winner;
     lastRound.current = round;
+    lastCheck.current = check;
   }, [
     game.reveal?.sequence,
+    game.verification?.startedAt,
+    game.verification?.status,
     game.review?.startedAt,
     game.winner?.startedAt,
     game.currentRoundIndex,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { REVELADO, retardo } from "@/lib/reveal";
 import type { BingoRound, WinnerState } from "@/lib/types";
 
 const CONFETTI_COLORS = ["#C62828", "#FFFDF8", "#2B5C9C", "#D9A441", "#41644A"];
@@ -11,7 +12,8 @@ function Confetti({ pieces = 36 }: { pieces?: number }) {
       Array.from({ length: pieces }, (_, i) => ({
         id: i,
         left: Math.random() * 100,
-        delay: Math.random() * 2.5,
+        // El confeti arranca junto con el golpe del «¡BINGO!», no antes.
+        delay: REVELADO.golpe + Math.random() * 2.5,
         duration: 3 + Math.random() * 2.5,
         color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
         size: 8 + Math.random() * 10,
@@ -44,6 +46,11 @@ function Confetti({ pieces = 36 }: { pieces?: number }) {
   );
 }
 
+/**
+ * Celebración del ganador. Entra por partes: primero la tensión («el veredicto
+ * es…»), después el golpe del ¡BINGO! con el confeti y los aplausos, y recién
+ * al final el premio y lo que viene.
+ */
 export function WinnerCelebration({
   winner,
   nextRound,
@@ -55,38 +62,66 @@ export function WinnerCelebration({
   nextPatternName?: string;
 }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] text-center">
+    <div className="relative h-full w-full overflow-hidden rounded-[2rem]">
       <Confetti />
-      <div className="relative z-10 flex animate-[zoom-entrada_0.45s_cubic-bezier(0.2,0.9,0.3,1)] flex-col items-center gap-3 px-6">
-        <p className="font-display text-[clamp(1.2rem,3.5vh,2.4rem)] font-bold uppercase tracking-[0.35em] text-crema/80">
+
+      <div className="escena relative z-10">
+        <p
+          className="escena-rotulo revelar"
+          style={{ animationDelay: retardo(REVELADO.rotulo) }}
+        >
+          El veredicto es…
+        </p>
+
+        <div className="relative flex items-center justify-center">
+          <span
+            aria-hidden
+            className="sin-movimiento-ocultar absolute h-[26vh] w-[26vh] rounded-full bg-dorado/35 animate-[halo_1.2s_ease-out_both]"
+            style={{ animationDelay: retardo(REVELADO.golpe) }}
+          />
+          <h1
+            className="escena-titulo relative animate-[veredicto-golpe_0.8s_cubic-bezier(0.2,0.9,0.3,1)_backwards] text-[clamp(4rem,24vh,18rem)] text-dorado drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)]"
+            style={{ animationDelay: retardo(REVELADO.golpe) }}
+          >
+            ¡Bingo!
+          </h1>
+        </div>
+
+        <p
+          className="escena-rotulo revelar text-crema/80"
+          style={{ animationDelay: retardo(REVELADO.detalle) }}
+        >
           ¡Tenemos ganador!
         </p>
-        <h1 className="font-display text-[clamp(5rem,26vh,20rem)] font-black uppercase leading-[0.85] text-dorado drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-          ¡Bingo!
-        </h1>
+
         {winner.winnerName && (
-          <p className="font-display text-[clamp(1.6rem,5vh,3.5rem)] font-bold text-papel">
+          <p
+            className="escena-dato revelar"
+            style={{ animationDelay: retardo(REVELADO.detalle) }}
+          >
             {winner.winnerName}
           </p>
         )}
-        <div className="mt-2 rounded-2xl border-2 border-crema/35 bg-noche/45 px-8 py-4 backdrop-blur-sm">
-          <p className="text-[clamp(0.9rem,2vh,1.4rem)] font-semibold uppercase tracking-[0.2em] text-crema/70">
-            Premio
-          </p>
-          <p className="font-display text-[clamp(1.8rem,6vh,4rem)] font-black text-papel">
-            {winner.prize}
-          </p>
-          <p className="text-[clamp(0.8rem,1.8vh,1.2rem)] font-semibold uppercase tracking-[0.18em] text-crema/60">
+
+        <div
+          className="escena-panel revelar border-crema/35 bg-noche/45 backdrop-blur-sm"
+          style={{ animationDelay: retardo(REVELADO.cierre) }}
+        >
+          <p className="escena-rotulo">Premio</p>
+          <p className="escena-dato text-[clamp(1.6rem,6vh,4rem)]">{winner.prize}</p>
+          <p className="escena-rotulo">
             {winner.roundName} · {winner.patternName}
           </p>
         </div>
 
-        <p className="mt-1 text-[clamp(0.8rem,2vh,1.4rem)] font-semibold uppercase tracking-[0.18em] text-crema/70">
+        <p
+          className="escena-rotulo revelar"
+          style={{ animationDelay: retardo(REVELADO.cierre + 0.4) }}
+        >
           {nextRound ? (
             <>
               A continuación · {nextRound.name} ·{" "}
-              <span className="text-dorado">{nextPatternName}</span> ·{" "}
-              {nextRound.prize}
+              <span className="text-dorado">{nextPatternName}</span> · {nextRound.prize}
             </>
           ) : (
             "Era el último premio de la noche"

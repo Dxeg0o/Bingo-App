@@ -26,6 +26,7 @@ import type {
   GameSettings,
   PatternCells,
   ReviewOrder,
+  VerificationState,
 } from "./types";
 import { createCustomPattern } from "./patterns";
 
@@ -70,6 +71,14 @@ type GameStore = {
   declareWinner: (winnerName?: string) => void;
   endCelebration: () => void;
 
+  startVerification: () => void;
+  rejectCard: (input: {
+    cardLabel?: string;
+    missingCount: number;
+    holdMs: number | null;
+  }) => void;
+  endVerification: () => void;
+
   startCountdown: (seconds: number) => void;
   cancelCountdown: () => void;
 
@@ -105,6 +114,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         reveal: null,
         review: null,
         winner: null,
+        verification: null,
         countdown: null,
         intermission: { startedAt: Date.now(), finishedRoundName, nextRoundIndex: null },
       };
@@ -117,6 +127,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       reveal: null,
       review: null,
       winner: null,
+      verification: null,
       countdown: null,
       intermission: {
         startedAt: Date.now(),
@@ -223,6 +234,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           // o el intermedio en curso.
           winner: null,
           intermission: null,
+          verification: null,
           review: shouldReview
             ? {
                 order: g.settings.reviewOrder,
@@ -359,6 +371,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         review: null,
         winner: null,
         intermission: null,
+        verification: null,
       })),
 
     /** Cierra la ronda y deja el proyector en espera de la siguiente. */
@@ -462,6 +475,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           reveal: null,
           review: null,
           intermission: null,
+          verification: null,
           winner: {
             prize: round?.prize ?? "Premio",
             roundName: round?.name ?? "Ronda",
@@ -488,6 +502,69 @@ export const useGameStore = create<GameStore>()((set, get) => {
         return intermissionFor(g, winner.nextRoundIndex, winner.roundName);
       }),
 
+    /**
+     * Abre el suspenso en el proyector: «estamos revisando un cartón». El
+     * veredicto llega después, con `resolveVerification`.
+     */
+    startVerification: () =>
+      commit((g) => {
+        // Durante una celebración manda la celebración: verificar el cartón
+        // siguiente no debe robarle la pantalla.
+        if (g.winner) return g;
+        const round = g.rounds[g.currentRoundIndex];
+        const pattern = getPattern(round?.patternId ?? "one-line", g.customPatterns);
+        return {
+          ...g,
+          reveal: null,
+          review: null,
+          verification: {
+            startedAt: Date.now(),
+            status: "checking",
+            roundName: round?.name ?? "Ronda",
+            patternName: pattern.name,
+            prize: round?.prize ?? "Premio",
+            endsAt: null,
+            missingCount: 0,
+          },
+        };
+      }),
+
+    /**
+     * El operador decide mostrar que el cartón no era bingo. `holdMs` null =
+     * se queda en pantalla hasta que lo saque a mano.
+     */
+    rejectCard: ({ cardLabel, missingCount, holdMs }) =>
+      commit((g) => {
+        const round = g.rounds[g.currentRoundIndex];
+        const pattern = getPattern(round?.patternId ?? "one-line", g.customPatterns);
+        const base: VerificationState = g.verification ?? {
+          startedAt: Date.now(),
+          status: "checking",
+          roundName: round?.name ?? "Ronda",
+          patternName: pattern.name,
+          prize: round?.prize ?? "Premio",
+          endsAt: null,
+          missingCount: 0,
+        };
+        return {
+          ...g,
+          reveal: null,
+          review: null,
+          verification: {
+            ...base,
+            status: "invalid",
+            // `startedAt` se renueva: es el instante del revelado, y el
+            // proyector lo usa como llave para reiniciar la animación.
+            startedAt: Date.now(),
+            cardLabel: cardLabel?.trim() || undefined,
+            endsAt: holdMs === null ? null : Date.now() + holdMs,
+            missingCount,
+          },
+        };
+      }),
+
+    endVerification: () => commit((g) => ({ ...g, verification: null })),
+
     startCountdown: (seconds) =>
       commit((g) => ({
         ...g,
@@ -513,6 +590,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         review: null,
         winner: null,
         intermission: null,
+        verification: null,
         countdown: null,
       })),
   };

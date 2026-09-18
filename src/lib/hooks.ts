@@ -63,6 +63,9 @@ export function isCelebrationActive(game: BingoGameState): boolean {
 
 export function getDisplayState(game: BingoGameState, now: number): DisplayState {
   if (isCelebrationActive(game)) return "WINNER";
+  // La revisión de un cartón se toma la pantalla completa: es el momento de
+  // suspenso de la noche y no debe competir con el tablero.
+  if (game.verification) return "CARD_CHECK";
   if (game.intermission) {
     return game.intermission.nextRoundIndex === null
       ? "GAME_OVER"
@@ -85,6 +88,7 @@ export function getNextTransition(game: BingoGameState, now: number): number | n
     game.reveal?.endsAt ?? null,
     game.review?.pending ? null : (game.review?.startedAt ?? null),
     game.review?.pending ? null : (game.review?.endsAt ?? null),
+    game.verification?.endsAt ?? null,
   ].filter((t): t is number => typeof t === "number" && t > now);
   return candidates.length > 0 ? Math.min(...candidates) : null;
 }

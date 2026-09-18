@@ -1,4 +1,4 @@
-import { Check, Trophy } from "lucide-react";
+import { Check, PartyPopper, Trophy } from "lucide-react";
 import { getPattern } from "@/lib/patterns";
 import type { BingoGameState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
@@ -6,7 +6,9 @@ import { PatternPreview } from "./PatternPreview";
 
 /**
  * Pantalla de espera entre rondas. El premio y la modalidad ya cambiaron: aquí
- * el público los ve antes de que el operador dé el vamos.
+ * el público los ve antes de que el operador dé el vamos. La escala y el ritmo
+ * vertical vienen de las clases `.escena*` (globals.css), iguales para todas
+ * las pantallas a pantalla completa.
  */
 export function RoundIntermission({
   game,
@@ -21,63 +23,57 @@ export function RoundIntermission({
   const pattern = getPattern(round?.patternId ?? "one-line", game.customPatterns);
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-[2.5vmin] overflow-hidden text-center">
+    <div className="escena">
       {intermission?.finishedRoundName && (
-        <p className="flex items-center gap-3 rounded-full border-2 border-dorado/50 bg-dorado/15 px-[2.5vmin] py-[0.8vmin] text-[clamp(0.8rem,2vmin,1.4rem)] font-bold uppercase tracking-[0.2em] text-dorado">
-          <Check className="h-[2.4vmin] w-[2.4vmin]" aria-hidden />
+        <p className="escena-pastilla border-dorado/50 bg-dorado/15 text-dorado">
+          <Check className="h-[2vh] w-[2vh] shrink-0" aria-hidden />
           {intermission.finishedRoundName} terminada
         </p>
       )}
 
       <div>
-        <p className="font-display text-[clamp(1rem,3vmin,2rem)] font-bold uppercase tracking-[0.4em] text-crema/60">
-          Próxima ronda
-        </p>
-        <h2 className="font-display text-[clamp(2.5rem,11vmin,8rem)] font-black uppercase leading-[0.9] text-dorado">
-          {round?.name ?? "Ronda"}
-        </h2>
+        <p className="escena-rotulo">Próxima ronda</p>
+        <h2 className="escena-titulo mt-1 text-dorado">{round?.name ?? "Ronda"}</h2>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-[4vmin]">
-        <div>
-          <p className="text-[clamp(0.7rem,1.6vmin,1.1rem)] font-bold uppercase tracking-[0.25em] text-crema/60">
-            Ahora jugamos
-          </p>
-          <p className="font-display text-[clamp(1.6rem,5.5vmin,3.6rem)] font-black uppercase text-papel">
-            {pattern.name}
-          </p>
+      <div className="escena-fila">
+        <div className="escena-panel">
+          <p className="escena-rotulo">Ahora jugamos</p>
+          <div className="flex items-center justify-center gap-[clamp(1rem,2.5vw,2.5rem)]">
+            <p className="escena-dato min-w-0 uppercase">{pattern.name}</p>
+            <div className="shrink-0">
+              <PatternPreview
+                pattern={pattern}
+                freeCenter={game.settings.freeCenter}
+                theme="dark"
+                size="lg"
+                showLetters={false}
+              />
+            </div>
+          </div>
         </div>
-        <PatternPreview
-          pattern={pattern}
-          freeCenter={game.settings.freeCenter}
-          theme="dark"
-          size="lg"
-        />
-        <div>
-          <p className="text-[clamp(0.7rem,1.6vmin,1.1rem)] font-bold uppercase tracking-[0.25em] text-crema/60">
-            Premio
-          </p>
-          <p className="flex items-center gap-3 font-display text-[clamp(1.6rem,5.5vmin,3.6rem)] font-black text-papel">
-            <Trophy className="h-[4vmin] w-[4vmin] shrink-0 text-dorado" aria-hidden />
-            {round?.prize}
+
+        <div className="escena-panel">
+          <p className="escena-rotulo">Premio</p>
+          <p className="escena-dato flex items-center justify-center gap-[clamp(0.6rem,1.6vw,1.4rem)]">
+            <Trophy className="h-[5vh] w-[5vh] shrink-0 text-dorado" aria-hidden />
+            <span className="min-w-0">{round?.prize}</span>
           </p>
         </div>
       </div>
 
       {round?.description && (
-        <p className="max-w-[70%] font-display text-[clamp(1rem,2.6vmin,1.8rem)] italic text-crema/70">
-          {round.description}
-        </p>
+        <p className="escena-nota max-w-[min(70ch,85%)]">{round.description}</p>
       )}
 
       <RoundsTrail game={game} activeIndex={index} />
 
       {game.countdown && countdownLeft > 0 ? (
-        <p className="num text-[clamp(2.5rem,11vmin,7rem)] font-black leading-none text-crema">
+        <p className="num text-[clamp(2.2rem,10vh,6.5rem)] font-black leading-none text-crema">
           {formatCountdown(countdownLeft)}
         </p>
       ) : (
-        <p className="animate-[latido_2.4s_ease-in-out_infinite] font-display text-[clamp(1.2rem,3.6vmin,2.4rem)] italic text-crema/80">
+        <p className="escena-nota animate-[latido_2.4s_ease-in-out_infinite]">
           Seguimos con los mismos {game.drawnNumbers.length} números… ¡no borren sus
           cartones!
         </p>
@@ -89,31 +85,28 @@ export function RoundIntermission({
 /** Pantalla final: se jugaron todas las rondas. */
 export function GameOver({ game }: { game: BingoGameState }) {
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-[3vmin] overflow-hidden text-center">
-      <p className="font-display text-[clamp(1rem,3vmin,2rem)] font-bold uppercase tracking-[0.4em] text-crema/60">
-        {game.eventName}
-      </p>
-      <h2 className="font-display text-[clamp(3rem,14vmin,10rem)] font-black uppercase leading-[0.9] text-dorado">
+    <div className="escena">
+      <p className="escena-rotulo">{game.eventName}</p>
+
+      <h2 className="escena-titulo flex flex-wrap items-center justify-center gap-[clamp(0.75rem,2vw,2rem)] text-dorado">
+        <PartyPopper className="h-[9vh] w-[9vh] shrink-0 text-rojo-claro" aria-hidden />
         ¡Se acabó el bingo!
       </h2>
-      <p className="font-display text-[clamp(1.2rem,3.6vmin,2.4rem)] italic text-crema/80">
-        Gracias por jugar. Estos fueron los premios de la noche:
-      </p>
-      <ul className="flex flex-wrap items-center justify-center gap-[1.5vmin]">
+
+      <p className="escena-nota">Estos fueron los premios de la noche</p>
+
+      <ul className="escena-fila max-w-[1500px] grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
         {game.rounds.map((round) => (
-          <li
-            key={round.id}
-            className="rounded-2xl border-2 border-crema/25 bg-white/5 px-[2.5vmin] py-[1.2vmin]"
-          >
-            <p className="text-[clamp(0.6rem,1.4vmin,1rem)] font-bold uppercase tracking-[0.2em] text-crema/55">
-              {round.name}
-            </p>
-            <p className="font-display text-[clamp(1rem,2.8vmin,1.9rem)] font-black text-papel">
-              {round.prize}
-            </p>
+          <li key={round.id} className="escena-panel items-center">
+            <p className="escena-rotulo">{round.name}</p>
+            <p className="escena-dato text-[clamp(1rem,3vh,2.1rem)]">{round.prize}</p>
           </li>
         ))}
       </ul>
+
+      <p className="escena-titulo text-[clamp(1.1rem,3.4vh,2.4rem)] tracking-[0.2em] text-crema">
+        ¡Gracias por jugar!
+      </p>
     </div>
   );
 }
@@ -127,7 +120,7 @@ function RoundsTrail({
   activeIndex: number;
 }) {
   return (
-    <ol className="flex flex-wrap items-center justify-center gap-[1.2vmin]">
+    <ol className="flex max-w-full flex-wrap items-center justify-center gap-[clamp(0.4rem,1.2vh,1rem)]">
       {game.rounds.map((round, i) => {
         const done = i < activeIndex;
         const active = i === activeIndex;
@@ -135,15 +128,15 @@ function RoundsTrail({
           <li
             key={round.id}
             className={[
-              "flex items-center gap-2 rounded-full border-2 px-[1.8vmin] py-[0.5vmin] text-[clamp(0.6rem,1.5vmin,1.05rem)] font-bold uppercase tracking-[0.12em]",
+              "escena-pastilla shrink-0",
               active
                 ? "border-dorado bg-dorado text-noche"
                 : done
-                  ? "border-crema/25 bg-white/5 text-crema/45 line-through"
-                  : "border-crema/20 text-crema/60",
+                  ? "bg-white/5 text-crema/45 line-through"
+                  : "text-crema/60",
             ].join(" ")}
           >
-            {done && <Check className="h-[1.6vmin] w-[1.6vmin]" aria-hidden />}
+            {done && <Check className="h-[1.5vh] w-[1.5vh] shrink-0" aria-hidden />}
             {round.name}
           </li>
         );

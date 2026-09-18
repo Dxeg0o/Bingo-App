@@ -76,6 +76,7 @@ export function createInitialState(): BingoGameState {
     review: null,
     winner: null,
     intermission: null,
+    verification: null,
     countdown: null,
     setupCompleted: false,
     updatedAt: Date.now(),

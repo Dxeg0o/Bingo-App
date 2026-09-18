@@ -113,6 +113,29 @@ export type IntermissionState = {
   nextRoundIndex: number | null;
 };
 
+/**
+ * Revisión de un cartón en vivo. El proyector muestra primero el suspenso
+ * («revisando…») y recién después el veredicto, para que el público lo viva.
+ */
+export type VerificationState = {
+  startedAt: number;
+  /**
+   * `checking` mientras el operador ingresa y comprueba el cartón; `invalid`
+   * cuando decide mostrar que no era bingo. Un cartón bueno no pasa por aquí:
+   * salta directo a la celebración.
+   */
+  status: "checking" | "invalid";
+  /** Nombre o mesa del participante, si el operador lo escribió. */
+  cardLabel?: string;
+  roundName: string;
+  patternName: string;
+  prize: string;
+  /** Cuándo se va sola de pantalla; null = se queda hasta que el operador actúe. */
+  endsAt: number | null;
+  /** Casillas que faltaban, para explicarlo en pantalla cuando no es válido. */
+  missingCount: number;
+};
+
 export type CountdownState = {
   endsAt: number;
 };
@@ -130,6 +153,7 @@ export type BingoGameState = {
   review: ReviewState | null;
   winner: WinnerState | null;
   intermission: IntermissionState | null;
+  verification: VerificationState | null;
   countdown: CountdownState | null;
   setupCompleted: boolean;
   updatedAt: number;
@@ -143,6 +167,7 @@ export type DisplayState =
   | "REVIEW"
   | "PAUSED"
   | "WINNER"
+  | "CARD_CHECK"
   | "ROUND_INTERMISSION"
   | "GAME_OVER";
 
