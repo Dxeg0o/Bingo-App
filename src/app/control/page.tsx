@@ -1,0 +1,358 @@
+"use client";
+
+import {
+  Grid3x3,
+  History,
+  Keyboard,
+  ListOrdered,
+  PartyPopper,
+  Settings,
+  Sparkles,
+  Tv,
+} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { BingoBoard } from "@/components/bingo/BingoBoard";
+import { BingoValidator } from "@/components/bingo/BingoValidator";
+import { GameProgress } from "@/components/bingo/GameProgress";
+import { HistoryPanel } from "@/components/bingo/HistoryPanel";
+import { NumberInput } from "@/components/bingo/NumberInput";
+import { NumberSearch } from "@/components/bingo/NumberSearch";
+import { OperatorControls } from "@/components/bingo/OperatorControls";
+import { PatternBuilder } from "@/components/bingo/PatternBuilder";
+import { RecentNumbers } from "@/components/bingo/RecentNumbers";
+import { RoundIndicator } from "@/components/bingo/RoundIndicator";
+import { RoundsManager } from "@/components/bingo/RoundsManager";
+import { SettingsPanel } from "@/components/bingo/SettingsPanel";
+import { ShortcutsPanel } from "@/components/bingo/ShortcutsPanel";
+import { Banderines } from "@/components/layout/Banderines";
+import { Button } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { ConfirmHost, confirmAction } from "@/components/ui/confirm";
+import { Select } from "@/components/ui/field";
+import { Modal, anyModalOpen } from "@/components/ui/modal";
+import { focusNumberInput } from "@/components/bingo/NumberInput";
+import { isReviewActive, useInitGame, useNow } from "@/lib/hooks";
+import { getAllPatterns, getPattern } from "@/lib/patterns";
+import { useGameStore } from "@/lib/store";
+
+export default function ControlPage() {
+  const hydrated = useInitGame();
+  const game = useGameStore((s) => s.game);
+  const startReview = useGameStore((s) => s.startReview);
+  const endReview = useGameStore((s) => s.endReview);
+  const togglePause = useGameStore((s) => s.togglePause);
+  const setCurrentPattern = useGameStore((s) => s.setCurrentPattern);
+  const endCelebration = useGameStore((s) => s.endCelebration);
+  const newGame = useGameStore((s) => s.newGame);
+
+  const [openModal, setOpenModal] = useState<
+    null | "validator" | "rounds" | "settings" | "patterns" | "shortcuts" | "history"
+  >(null);
+
+  const round = game.rounds[game.currentRoundIndex];
+  const pattern = getPattern(round?.patternId ?? "one-line", game.customPatterns);
+  useNow(game.review?.endsAt ?? null);
+  const reviewing = isReviewActive(game, Date.now());
+
+  const toggleReview = useCallback(() => {
+    if (isReviewActive(useGameStore.getState().game, Date.now())) endReview();
+    else startReview();
+  }, [startReview, endReview]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (anyModalOpen()) return;
+      const target = event.target as HTMLElement | null;
+      const isBingoInput = target?.dataset?.bingoInput !== undefined;
+      const editable =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable === true;
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        window.dispatchEvent(new Event("bingo:undo"));
+        return;
+      }
+      if (editable && !isBingoInput) return;
+
+      switch (event.key.toLowerCase()) {
+        case "r":
+          event.preventDefault();
+          toggleReview();
+          break;
+        case "p":
+          event.preventDefault();
+          togglePause();
+          break;
+        case "c":
+          event.preventDefault();
+          window.dispatchEvent(new Event("bingo:correct"));
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleReview, togglePause]);
+
+  useEffect(() => {
+    if (hydrated) focusNumberInput();
+  }, [hydrated]);
+
+  if (!hydrated) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-crema">
+        <p className="font-display text-xl text-azul">Cargando partida…</p>
+      </main>
+    );
+  }
+
+  return (
+    <div className="textura-papel min-h-dvh bg-crema pb-8">
+      <Banderines className="text-azul" />
+
+      <header className="mx-auto flex max-w-[1700px] flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-rojo">
+            Panel del operador
+          </p>
+          <h1 className="truncate font-display text-3xl font-black text-azul">
+            {game.eventName}
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
+              game.status === "paused"
+                ? "bg-rojo text-papel"
+                : game.status === "playing"
+                  ? "bg-verde text-papel"
+                  : "bg-azul/15 text-azul"
+            }`}
+          >
+            {game.status === "paused"
+              ? "En pausa"
+              : game.status === "playing"
+                ? "En juego"
+                : "Pantalla previa"}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setOpenModal("rounds")}>
+            <ListOrdered className="h-4 w-4" /> Rondas
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenModal("patterns")}>
+            <Grid3x3 className="h-4 w-4" /> Patrones
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenModal("settings")}>
+            <Settings className="h-4 w-4" /> Configuración
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenModal("shortcuts")}>
+            <Keyboard className="h-4 w-4" /> Atajos
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/display", "bingo-display", "noopener")}
+          >
+            <Tv className="h-4 w-4" /> Proyector
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={async () => {
+              const ok = await confirmAction({
+                title: "Nueva partida",
+                message:
+                  "Esto eliminará el estado de la partida actual (números sorteados y ronda en curso). Las rondas, patrones y configuración se mantienen.",
+                confirmLabel: "Nueva partida",
+                tone: "danger",
+              });
+              if (ok) {
+                newGame();
+                toast.success("Nueva partida lista");
+              }
+            }}
+          >
+            Nueva partida
+          </Button>
+          <Link
+            href="/"
+            className="rounded-lg px-2 py-1 text-sm font-semibold text-azul/70 underline-offset-4 hover:underline"
+          >
+            Inicio
+          </Link>
+        </div>
+      </header>
+
+      {game.winner && (
+        <div className="mx-auto mb-3 flex max-w-[1700px] flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dorado bg-dorado/20 px-4 py-3">
+          <p className="flex items-center gap-2 font-display text-xl font-black text-noche">
+            <PartyPopper className="h-6 w-6 text-rojo" />
+            ¡Celebración en pantalla! Premio: {game.winner.prize}
+            {game.winner.winnerName ? ` · ${game.winner.winnerName}` : ""}
+          </p>
+          <Button
+            variant="rojo"
+            onClick={() => {
+              endCelebration();
+              focusNumberInput();
+            }}
+          >
+            Finalizar celebración
+          </Button>
+        </div>
+      )}
+
+      <main className="mx-auto grid max-w-[1700px] gap-4 px-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader title="Número sorteado" icon={<Sparkles className="h-4 w-4" />} />
+            <CardBody>
+              <NumberInput />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Acciones del bingo" />
+            <CardBody>
+              <OperatorControls onOpenValidator={() => setOpenModal("validator")} />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Tablero"
+              action={
+                <span className="num text-xs font-bold text-noche/55">
+                  {game.drawnNumbers.length} / 75
+                </span>
+              }
+            />
+            <CardBody>
+              <BingoBoard drawnNumbers={game.drawnNumbers} compact />
+            </CardBody>
+          </Card>
+        </div>
+
+        <aside className="flex flex-col gap-4">
+          <Card>
+            <CardHeader title="Ronda en juego" />
+            <CardBody className="flex flex-col gap-3">
+              <RoundIndicator
+                round={round}
+                pattern={pattern}
+                index={game.currentRoundIndex}
+                total={game.rounds.length}
+                freeCenter={game.settings.freeCenter}
+              />
+
+              <div>
+                <label
+                  htmlFor="modalidad"
+                  className="mb-1 block text-xs font-bold uppercase tracking-[0.1em] text-azul/70"
+                >
+                  Cambiar modalidad de esta ronda
+                </label>
+                <Select
+                  id="modalidad"
+                  value={round?.patternId ?? "one-line"}
+                  onChange={(event) => {
+                    setCurrentPattern(event.target.value);
+                    toast.success("Modalidad actualizada");
+                  }}
+                >
+                  {getAllPatterns(game.customPatterns).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Últimos números" />
+            <CardBody className="flex flex-col gap-3">
+              <RecentNumbers drawnNumbers={game.drawnNumbers} count={7} size="md" />
+              <GameProgress count={game.drawnNumbers.length} />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="¿Salió este número?" />
+            <CardBody>
+              <NumberSearch />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Historial"
+              icon={<History className="h-4 w-4" />}
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpenModal("history")}
+                >
+                  Ver todo
+                </Button>
+              }
+            />
+            <CardBody className="max-h-[320px] overflow-y-auto">
+              <HistoryPanel drawnNumbers={game.drawnNumbers.slice(-12)} />
+            </CardBody>
+          </Card>
+        </aside>
+      </main>
+
+      {reviewing && (
+        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border-2 border-dorado bg-noche px-5 py-2.5 text-papel shadow-xl">
+          <span className="flex items-center gap-3 text-sm font-bold uppercase tracking-[0.15em]">
+            Repaso en pantalla
+            <Button variant="dorado" size="sm" onClick={endReview}>
+              Salir del repaso
+            </Button>
+          </span>
+        </div>
+      )}
+
+      <BingoValidator
+        open={openModal === "validator"}
+        onClose={() => {
+          setOpenModal(null);
+          focusNumberInput();
+        }}
+      />
+      <RoundsManager open={openModal === "rounds"} onClose={() => setOpenModal(null)} />
+      <SettingsPanel open={openModal === "settings"} onClose={() => setOpenModal(null)} />
+      <PatternBuilder open={openModal === "patterns"} onClose={() => setOpenModal(null)} />
+      <ShortcutsPanel open={openModal === "shortcuts"} onClose={() => setOpenModal(null)} />
+      <HistoryModal open={openModal === "history"} onClose={() => setOpenModal(null)} />
+      <ConfirmHost />
+    </div>
+  );
+}
+
+function HistoryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const drawnNumbers = useGameStore((s) => s.game.drawnNumbers);
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Historial completo"
+      description={`${drawnNumbers.length} números sorteados, del más reciente al primero.`}
+      size="md"
+    >
+      <div className="max-h-[60vh] overflow-y-auto">
+        <HistoryPanel drawnNumbers={drawnNumbers} />
+      </div>
+    </Modal>
+  );
+}
