@@ -17,8 +17,8 @@ export function ReviewMode({
   return (
     <div className={cn("flex h-full flex-col items-center justify-center gap-4", className)}>
       <div className="text-center">
-        <h2 className="font-display text-[clamp(2rem,6vh,4.5rem)] font-black uppercase tracking-tight text-dorado">
-          Repaso de números
+        <h2 className="font-fonda text-[clamp(2.8rem,8vh,5.5rem)] leading-none text-dorado">
+          Repasemos los que han salido
         </h2>
         <p className="text-[clamp(0.9rem,2.2vh,1.6rem)] font-semibold uppercase tracking-[0.2em] text-crema/70">
           {order === "numeric" ? "Orden numérico" : "Orden de sorteo"} ·{" "}

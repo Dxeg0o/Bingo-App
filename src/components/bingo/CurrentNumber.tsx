@@ -1,5 +1,6 @@
 import type { BingoLetter } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ZapateoMarks } from "./FiestasPatriasDecor";
 
 export function CurrentNumber({
   value,
@@ -23,6 +24,7 @@ export function CurrentNumber({
         className,
       )}
     >
+      {variant === "display" && <ZapateoMarks />}
       <span
         className={cn(
           "font-display font-black uppercase",

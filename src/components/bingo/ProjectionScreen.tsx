@@ -13,7 +13,7 @@ import { getPattern } from "@/lib/patterns";
 import { playSound } from "@/lib/sounds";
 import type { BingoGameState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
-import { Banderines } from "@/components/layout/Banderines";
+import { RamadaHeader } from "@/components/layout/RamadaHeader";
 import { BingoBoard } from "./BingoBoard";
 import { CurrentNumber } from "./CurrentNumber";
 import { GameProgress } from "./GameProgress";
@@ -21,6 +21,7 @@ import { PatternPreview } from "./PatternPreview";
 import { RecentNumbers } from "./RecentNumbers";
 import { ReviewMode } from "./ReviewMode";
 import { WinnerCelebration } from "./WinnerCelebration";
+import { Copihue, Emboque, MomentEffects, RamadaBackdrop, RayuelaMark, Trompo } from "./FiestasPatriasDecor";
 
 export function ProjectionScreen({ game }: { game: BingoGameState }) {
   // `Date.now()` se recalcula en cada render y `useNow` agenda el render
@@ -40,7 +41,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
   return (
     <div className="textura-noche flex h-dvh w-full flex-col overflow-hidden text-crema">
-      <Banderines className="shrink-0 text-crema" />
+      <RamadaHeader className="z-20 shrink-0" />
 
       {displayState !== "WINNER" && (
         <header className="flex shrink-0 items-center justify-between gap-6 px-6 pb-2 pt-3">
@@ -78,11 +79,17 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
       )}
 
       <main className="relative min-h-0 flex-1 px-6 pb-4">
+        <MomentEffects status={game.status} roundIndex={game.currentRoundIndex} />
           {displayState === "PRE_GAME" && (
             <Screen key="pre">
-              <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-                <p className="font-display text-[clamp(1rem,3vh,2rem)] font-bold uppercase tracking-[0.4em] text-crema/60">
-                  Bienvenidos
+              <RamadaBackdrop className="rounded-[2rem]" />
+              <Copihue className="absolute left-[5%] top-[8%] z-10 w-24 -rotate-12 opacity-90 lg:w-36" />
+              <Trompo className="absolute bottom-[6%] right-[6%] z-10 w-16 opacity-60 lg:w-24" />
+              <Emboque className="absolute bottom-[5%] left-[7%] z-10 w-12 rotate-[-10deg] opacity-50 lg:w-16" />
+              <RayuelaMark className="absolute bottom-[8%] left-[15%] z-10 hidden w-28 opacity-45 lg:block" />
+              <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 text-center">
+                <p className="font-fonda text-[clamp(1.8rem,5vh,3.4rem)] leading-none text-crema">
+                  ¡Se juega!
                 </p>
                 <h2 className="font-display text-[clamp(3rem,13vh,9rem)] font-black uppercase leading-[0.9] text-dorado">
                   {game.eventName}
@@ -90,7 +97,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-8">
                   <div>
                     <p className="text-[clamp(0.7rem,1.6vh,1.1rem)] font-bold uppercase tracking-[0.25em] text-crema/60">
-                      Próximo premio
+                      Premio de esta ronda
                     </p>
                     <p className="font-display text-[clamp(1.6rem,5vh,3.4rem)] font-black text-papel">
                       {round?.prize}
@@ -99,7 +106,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
                   <div className="h-16 w-px bg-crema/25" />
                   <div>
                     <p className="text-[clamp(0.7rem,1.6vh,1.1rem)] font-bold uppercase tracking-[0.25em] text-crema/60">
-                      Modalidad
+                      Vamos por
                     </p>
                     <p className="font-display text-[clamp(1.6rem,5vh,3.4rem)] font-black uppercase text-papel">
                       {pattern.name}
@@ -119,7 +126,7 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
                   </p>
                 ) : (
                   <p className="mt-6 font-display text-[clamp(1.2rem,4vh,2.6rem)] italic text-crema/75">
-                    Comenzamos pronto…
+                    Preparen sus cartones…
                   </p>
                 )}
               </div>
@@ -205,8 +212,10 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
           {displayState === "PAUSED" && (
             <Screen key="paused">
-              <div className="relative h-full">
-                <div className="pointer-events-none absolute inset-0 opacity-20">
+              <RamadaBackdrop className="rounded-[2rem]" />
+              <Trompo className="absolute bottom-[8%] right-[8%] z-10 w-16 opacity-55 lg:w-24" />
+              <div className="relative z-10 h-full">
+                <div className="pointer-events-none absolute inset-0 opacity-15">
                   <BingoBoard
                     drawnNumbers={game.drawnNumbers}
                     theme="dark"

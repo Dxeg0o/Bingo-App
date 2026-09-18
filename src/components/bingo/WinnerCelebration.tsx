@@ -2,10 +2,11 @@
 
 import { useMemo } from "react";
 import type { WinnerState } from "@/lib/types";
+import { Copihue, RamadaBackdrop } from "./FiestasPatriasDecor";
 
 const CONFETTI_COLORS = ["#C62828", "#FFFDF8", "#2B5C9C", "#D9A441", "#41644A"];
 
-function Confetti({ pieces = 70 }: { pieces?: number }) {
+function Confetti({ pieces = 36 }: { pieces?: number }) {
   const items = useMemo(
     () =>
       Array.from({ length: pieces }, (_, i) => ({
@@ -43,10 +44,12 @@ function Confetti({ pieces = 70 }: { pieces?: number }) {
 
 export function WinnerCelebration({ winner }: { winner: WinnerState }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden text-center">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] text-center">
+      <RamadaBackdrop variant="celebration" />
       <Confetti />
+      <Copihue className="absolute right-[5%] top-[7%] z-10 w-28 rotate-12 opacity-90 lg:w-40" />
       <div className="relative z-10 flex animate-[zoom-entrada_0.45s_cubic-bezier(0.2,0.9,0.3,1)] flex-col items-center gap-3 px-6">
-        <p className="font-display text-[clamp(1.2rem,3.5vh,2.4rem)] font-bold uppercase tracking-[0.35em] text-crema/80">
+        <p className="font-fonda text-[clamp(1.8rem,5vh,3.4rem)] leading-none text-crema">
           ¡Tenemos ganador!
         </p>
         <h1 className="font-display text-[clamp(5rem,26vh,20rem)] font-black uppercase leading-[0.85] text-dorado drop-shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
