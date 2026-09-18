@@ -60,7 +60,7 @@ export function BingoColumn({
                     ? "border-azul bg-azul text-papel"
                     : "border-azul/15 bg-crema/35 text-noche/45",
                 isLast &&
-                  "border-dorado bg-dorado text-noche ring-4 ring-dorado/45 scale-[1.06] z-10 animate-pulso",
+                  "border-dorado bg-dorado text-noche ring-4 ring-dorado/45 scale-[1.06] z-10",
               )}
             >
               {value}

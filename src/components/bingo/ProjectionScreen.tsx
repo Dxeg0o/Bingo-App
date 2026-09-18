@@ -13,7 +13,6 @@ import { getPattern } from "@/lib/patterns";
 import { playSound } from "@/lib/sounds";
 import type { BingoGameState } from "@/lib/types";
 import { formatCountdown } from "@/lib/utils";
-import { RamadaHeader } from "@/components/layout/RamadaHeader";
 import { BingoBoard } from "./BingoBoard";
 import { CurrentNumber } from "./CurrentNumber";
 import { GameProgress } from "./GameProgress";
@@ -21,7 +20,6 @@ import { PatternPreview } from "./PatternPreview";
 import { RecentNumbers } from "./RecentNumbers";
 import { ReviewMode } from "./ReviewMode";
 import { WinnerCelebration } from "./WinnerCelebration";
-import { CopihueVector, MomentEffects, RamadaFrame, RayuelaChilena, StableDetail, TrompoChileno, VolantinChileno } from "./FiestasPatriasDecor";
 
 export function ProjectionScreen({ game }: { game: BingoGameState }) {
   // `Date.now()` se recalcula en cada render y `useNow` agenda el render
@@ -41,8 +39,6 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
   return (
     <div className="textura-noche flex h-dvh w-full flex-col overflow-hidden text-crema">
-      <RamadaHeader className="z-20 shrink-0" />
-
       {displayState !== "WINNER" && (
         <header className="flex shrink-0 items-center justify-between gap-6 px-6 pb-2 pt-3">
           <div className="min-w-0">
@@ -79,15 +75,10 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
       )}
 
       <main className="relative min-h-0 flex-1 px-6 pb-4">
-        <MomentEffects status={game.status} roundIndex={game.currentRoundIndex} pattern={pattern} prize={round?.prize ?? "Premio"} freeCenter={game.settings.freeCenter} />
           {displayState === "PRE_GAME" && (
             <Screen key="pre">
-              <RamadaFrame />
-              <CopihueVector className="absolute left-[6%] top-[16%] z-10 h-28 w-20 opacity-80" />
-              <TrompoChileno spinning className="absolute bottom-[8%] right-[7%] z-10 h-20 w-14 opacity-60" />
-              <VolantinChileno className="absolute right-[17%] top-[17%] z-10 h-20 w-14 opacity-65" />
               <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 text-center">
-                <p className="text-[clamp(.8rem,1.8vh,1.2rem)] font-bold uppercase tracking-[.35em] text-crema/70">¡Se juega!</p>
+                <p className="font-display text-[clamp(1rem,3vh,2rem)] font-bold uppercase tracking-[0.4em] text-crema/60">Bienvenidos</p>
                 <h2 className="font-display text-[clamp(3rem,13vh,9rem)] font-black uppercase leading-[0.9] text-dorado">
                   {game.eventName}
                 </h2>
@@ -153,7 +144,6 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
           {displayState === "PLAYING" && (
             <Screen key="playing">
-              <StableDetail roundIndex={game.currentRoundIndex} />
               <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-6">
                 <div className="flex min-h-0 flex-col justify-between gap-4">
                   <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border-2 border-crema/20 bg-white/5 p-4">
@@ -210,8 +200,6 @@ export function ProjectionScreen({ game }: { game: BingoGameState }) {
 
           {displayState === "PAUSED" && (
             <Screen key="paused">
-              <RayuelaChilena className="absolute bottom-[8%] right-[8%] z-10 w-60 opacity-15" />
-              <TrompoChileno spinning className="absolute bottom-[8%] left-[8%] z-10 h-20 w-14 opacity-45" />
               <div className="relative z-10 h-full">
                 <div className="pointer-events-none absolute inset-0 opacity-15">
                   <BingoBoard
